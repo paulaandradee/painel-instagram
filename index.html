@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seu Painel</title>
+  <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+
+<!-- =============================================================
+     PÁGINA 1: LOGIN
+     ============================================================= -->
+<div id="tela-login" class="tela-login" hidden>
+  <div class="caixa-login">
+    <div class="marca" style="justify-content:center; margin-bottom:22px">
+      <span class="marca-icone" data-icone="raio"></span> Seu Painel
+    </div>
+    <div class="cartao" style="padding:28px">
+      <h1 class="titulo" style="font-size:20px">Entrar</h1>
+      <p class="texto-2" style="margin:4px 0 20px">Acesse o seu painel de automações.</p>
+      <form id="form-login" novalidate>
+        <div class="campo">
+          <label class="rotulo" for="login-email">E-mail</label>
+          <input class="input" id="login-email" type="email" autocomplete="username" placeholder="voce@exemplo.com">
+        </div>
+        <div class="campo">
+          <label class="rotulo" for="login-senha">Senha</label>
+          <input class="input" id="login-senha" type="password" autocomplete="current-password" placeholder="Sua senha">
+        </div>
+        <div id="login-erro" class="erro-login" hidden></div>
+        <button class="btn btn-primario" id="btn-entrar" type="submit" style="width:100%">Entrar</button>
+      </form>
+    </div>
+    <div id="aviso-login-local" class="faixa faixa-info" style="margin-top:14px" hidden>
+      <span data-icone="info"></span>
+      <span>Modo de teste local: qualquer e-mail e uma senha de 5 dígitos entram. No ar (produção), o login será pelo Supabase.</span>
+    </div>
+  </div>
+</div>
+
+<!-- =============================================================
+     PÁGINA 2: O SISTEMA
+     ============================================================= -->
+<div id="app" class="app" hidden>
+
+  <!-- Topo no celular -->
+  <div class="topo-mobile">
+    <div class="marca"><span class="marca-icone" data-icone="raio"></span> Seu Painel</div>
+    <button class="btn btn-icone btn-fantasma" id="btn-menu" aria-label="Abrir menu"><span data-icone="menu"></span></button>
+  </div>
+
+  <!-- Menu lateral -->
+  <aside class="lateral" id="lateral">
+    <div class="marca"><span class="marca-icone" data-icone="raio"></span> Seu Painel</div>
+    <nav class="menu">
+      <a class="menu-item" href="#inicio" data-rota="inicio"><span data-icone="casa"></span> Início</a>
+      <a class="menu-item" href="#calendario" data-rota="calendario"><span data-icone="calendario"></span> Calendário</a>
+      <a class="menu-item" href="#instagram" data-rota="instagram"><span data-icone="instagram"></span> Instagram</a>
+    </nav>
+    <div class="rodape-lateral">
+      <div class="usuario" id="usuario-email"></div>
+      <button class="menu-item" id="btn-sair"><span data-icone="sair"></span> Sair</button>
+    </div>
+  </aside>
+
+  <main class="conteudo">
+    <div id="aviso-modo-local" class="faixa faixa-atencao" style="margin-bottom:20px" hidden>
+      <span data-icone="info"></span>
+      <span>Você está no modo de teste local. Pra colocar no ar de verdade (com login e dados salvos), siga o LEIA-ME.</span>
+    </div>
+
+    <!-- INÍCIO -->
+    <section class="secao" id="secao-inicio" hidden>
+      <div class="cabecalho">
+        <div>
+          <h1 class="titulo">Bem-vindo ao seu painel</h1>
+          <p class="texto-2" style="margin:4px 0 0">Uma visão rápida do que está acontecendo.</p>
+        </div>
+      </div>
+      <div class="grade-cartoes">
+        <div class="cartao"><span class="rotulo">Leads captados</span><div class="numero" id="n-leads">0</div></div>
+        <div class="cartao"><span class="rotulo">Automações ativas</span><div class="numero" id="n-ativas">0</div></div>
+        <div class="cartao"><span class="rotulo">DMs enviadas (7 dias)</span><div class="numero" id="n-dms">0</div></div>
+      </div>
+      <h2 class="subtitulo" style="margin:28px 0 12px">Atalhos</h2>
+      <div class="linha">
+        <a class="btn" href="#instagram"><span data-icone="instagram"></span> Abrir Instagram</a>
+        <button class="btn" id="atalho-nova"><span data-icone="mais"></span> Nova automação</button>
+        <a class="btn" href="#calendario"><span data-icone="calendario"></span> Calendário</a>
+      </div>
+    </section>
+
+    <!-- CALENDÁRIO (placeholder) -->
+    <section class="secao" id="secao-calendario" hidden>
+      <div class="cartao vazio" style="padding:72px 20px">
+        <div class="vazio-icone" data-icone="calendario"></div>
+        <h1 class="titulo">Calendário</h1>
+        <p>Essa área vai chegar em breve pra você planejar seus conteúdos.</p>
+        <span class="chip chip-destaque">Em breve</span>
+      </div>
+    </section>
+
+    <!-- INSTAGRAM -->
+    <section class="secao" id="secao-instagram" hidden>
+      <div class="cabecalho">
+        <div>
+          <h1 class="titulo">Instagram</h1>
+          <p class="texto-2" style="margin:4px 0 0">Métricas da conta e respostas automáticas no direct.</p>
+        </div>
+      </div>
+      <div class="abas">
+        <button class="aba" data-aba="metricas">Métricas</button>
+        <button class="aba" data-aba="automacoes">Automações</button>
+      </div>
+
+      <div id="aba-metricas" hidden></div>
+
+      <div id="aba-automacoes" hidden>
+        <div class="linha-entre" style="margin-bottom:14px">
+          <p class="texto-2" style="margin:0">Quando alguém comentar a palavra certa, a DM sai sozinha.</p>
+          <button class="btn btn-primario" id="btn-nova"><span data-icone="mais"></span> Nova automação</button>
+        </div>
+        <div id="lista-automacoes" class="lista-auto"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- =============================================================
+     EDITOR DE AUTOMAÇÃO (tela cheia)
+     ============================================================= -->
+<div id="editor" class="editor" hidden>
+  <div class="editor-topo">
+    <button class="btn btn-icone btn-fantasma" id="ed-fechar" aria-label="Voltar"><span data-icone="voltar"></span></button>
+    <input class="input" id="ed-nome" placeholder="Nome da automação">
+    <label class="switch" style="margin-left:auto"><input type="checkbox" id="ed-ativa"><span class="trilho"></span><span class="pequeno">Ligada</span></label>
+    <button class="btn btn-primario" id="ed-salvar">Salvar</button>
+  </div>
+
+  <div class="editor-corpo">
+    <div class="editor-grade">
+      <div>
+        <div id="ed-erros" class="faixa faixa-erro erros" hidden></div>
+
+        <!-- BLOCO 1: GATILHO -->
+        <div class="cartao bloco">
+          <div class="bloco-titulo"><span class="bloco-num">1</span><h2 class="subtitulo">O gatilho</h2></div>
+
+          <div class="campo">
+            <div class="linha-entre"><span class="rotulo">Palavras que ativam</span>
+              <label class="switch"><input type="checkbox" id="ed-qualquer"><span class="trilho"></span><span class="pequeno">Qualquer palavra ativa</span></label>
+            </div>
+            <div class="tags" id="ed-tags"><input id="ed-tag-input" placeholder="Digite e aperte Enter"></div>
+            <div class="ajuda" id="ed-tags-ajuda">Ex: quero, link, eu. Maiúsculas e acentos não importam.</div>
+          </div>
+
+          <div class="campo">
+            <span class="rotulo">Em quais posts</span>
+            <div class="linha">
+              <button class="btn btn-p" id="ed-carregar-posts"><span data-icone="imagem"></span> Escolher posts</button>
+              <span class="pequeno texto-2" id="ed-posts-resumo">Vale pra todos os posts</span>
+            </div>
+            <div id="ed-posts"></div>
+          </div>
+
+          <div class="campo" style="margin-bottom:0">
+            <span class="rotulo">Resposta no comentário</span>
+            <input class="input" id="ed-resposta" placeholder="Ex: te chamei no direct">
+            <div id="ed-variacoes"></div>
+            <button class="btn btn-p btn-fantasma" id="ed-add-variacao" style="margin-top:6px"><span data-icone="mais"></span> Adicionar variação A/B</button>
+            <div class="ajuda">Texto público que responde quem comentou. Com variações, o sistema alterna entre elas.</div>
+          </div>
+        </div>
+
+        <!-- BLOCO 2: RESPOSTA -->
+        <div class="cartao bloco">
+          <div class="bloco-titulo"><span class="bloco-num">2</span><h2 class="subtitulo">A resposta</h2></div>
+
+          <div class="campo">
+            <span class="rotulo">Sua mensagem</span>
+            <div class="emojis" data-emojis></div>
+            <textarea class="textarea" id="ed-mensagem" placeholder="Oi! Que bom que você comentou. Toca no botão abaixo 👇"></textarea>
+          </div>
+
+          <div class="campo">
+            <label class="switch"><input type="checkbox" id="ed-botao-ligado"><span class="trilho"></span><span>Botão na mensagem</span></label>
+          </div>
+
+          <div id="ed-botao-area">
+            <div class="campo">
+              <div class="linha-entre"><span class="rotulo">Texto do botão</span><span class="contador" id="ed-botao-cont">0/20</span></div>
+              <input class="input" id="ed-botao-texto" placeholder="Ex: Quero receber">
+              <div class="ajuda">O Instagram corta o nome do botão em 20 caracteres.</div>
+              <div class="aviso-campo" id="ed-botao-aviso" hidden>Isso parece um link. O link vai no campo próprio, não no nome do botão. Escolha "Um link" abaixo que o sistema move pra você.</div>
+            </div>
+
+            <div class="campo">
+              <span class="rotulo">O que o botão faz quando ela toca</span>
+              <select class="select" id="ed-acao">
+                <option value="link">Um link: abre um site</option>
+                <option value="conversa">Continua a conversa: manda a próxima mensagem</option>
+              </select>
+            </div>
+
+            <div class="campo" id="ed-link-area">
+              <span class="rotulo">Link completo</span>
+              <textarea class="textarea textarea-link" id="ed-link" placeholder="https://..."></textarea>
+              <div class="ajuda">Cole o link inteiro aqui. A pessoa vê só o nome do botão; o link fica invisível.</div>
+            </div>
+
+            <div id="ed-conversa-area">
+              <hr class="divisor">
+              <span class="rotulo">A conversa</span>
+              <div id="ed-passos"></div>
+              <button class="btn" id="ed-add-passo"><span data-icone="mais"></span> Adicionar mensagem</button>
+            </div>
+          </div>
+
+          <hr class="divisor">
+          <div class="campo" style="margin-bottom:0">
+            <span class="rotulo">Anexar um arquivo (opcional)</span>
+            <div id="ed-arquivos"></div>
+            <div class="ajuda">O Instagram só deixa mandar uma mensagem antes da pessoa responder. Por isso o arquivo da Mensagem 1 chega quando ela já conversou com você. Pra garantir, mande o arquivo numa mensagem seguinte da conversa.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRÉVIA AO VIVO -->
+      <div class="previa-coluna">
+        <span class="rotulo" style="text-align:center; margin-top:4px">Prévia ao vivo</span>
+        <div class="celular">
+          <div class="cel-topo">
+            <div class="cel-avatar"></div>
+            <div><div class="cel-nome">sua_conta</div><div class="cel-sub">Instagram</div></div>
+          </div>
+          <div class="cel-chat" id="previa-chat"></div>
+          <div class="cel-rodape"><div class="cel-input">Mensagem...</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<div class="dica" id="dica" hidden></div>
+
+<!-- Cliente oficial do Supabase (se não carregar, o modo local continua funcionando) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script src="js/editor.js"></script>
+</body>
+</html>
