@@ -64,6 +64,7 @@ a { color: var(--destaque); }
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   padding: 8px 14px; border-radius: var(--raio-p); border: 1px solid var(--borda);
   background: var(--superficie); cursor: pointer; font-weight: 550; white-space: nowrap;
+  color: var(--texto); text-decoration: none; /* links com cara de botão não ficam sublinhados */
   transition: background .15s, border-color .15s;
 }
 .btn:hover { background: var(--superficie-2); }
@@ -149,6 +150,7 @@ a { color: var(--destaque); }
 .menu-item svg { width: 18px; height: 18px; }
 .menu-item:hover { background: var(--superficie-2); color: var(--texto); }
 .menu-item.ativo { background: var(--destaque-suave); color: var(--destaque); }
+.menu-item .externo { color: var(--texto-3); font-size: 12px; margin-left: 2px; }
 .rodape-lateral { border-top: 1px solid var(--borda); padding-top: 12px; }
 .usuario { font-size: 12.5px; color: var(--texto-2); padding: 0 10px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topo-mobile { display: none; }
