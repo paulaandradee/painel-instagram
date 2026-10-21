@@ -45,6 +45,8 @@ body {
 button, input, textarea, select { font: inherit; color: inherit; }
 a { color: var(--destaque); }
 [hidden] { display: none !important; }
+/* Texto só pra leitor de tela */
+.so-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* ---------- Tipografia ---------- */
 .titulo { font-size: 22px; font-weight: 650; letter-spacing: -.01em; margin: 0; }
@@ -187,6 +189,60 @@ a { color: var(--destaque); }
 .status { font-size: 12px; font-weight: 600; }
 .status.on { color: var(--sucesso); }
 .status.off { color: var(--texto-3); }
+
+/* Foto do post vinculado (lista de automações) */
+.thumb {
+  position: relative; width: 52px; height: 52px; border-radius: 8px; flex: none; overflow: hidden;
+  background: var(--superficie-2); border: 1px solid var(--borda); display: grid; place-items: center; color: var(--texto-3);
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb svg { width: 22px; height: 22px; }
+.thumb .mais {
+  position: absolute; right: 3px; bottom: 3px; background: rgba(17,24,39,.75); color: #fff;
+  font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 6px; line-height: 16px;
+}
+.thumb-todos { background: var(--destaque-suave); color: var(--destaque); border-color: transparent; }
+
+/* ---------- Interações (planilha de leads) ---------- */
+.resumo-mini { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.resumo-mini .cartao { padding: 14px 16px; }
+.resumo-mini .numero { font-size: 24px; }
+.barra-ferramentas { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.barra-ferramentas .input { flex: 1 1 220px; }
+.barra-ferramentas .select { width: auto; flex: 0 1 180px; }
+.tabela-wrap { overflow-x: auto; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie); box-shadow: var(--sombra); }
+.planilha { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 1100px; }
+.planilha th {
+  position: sticky; top: 0; background: var(--fundo); text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--texto-2); padding: 10px 12px; border-bottom: 1px solid var(--borda); white-space: nowrap;
+}
+.planilha th[data-ordem] { cursor: pointer; user-select: none; }
+.planilha th[data-ordem]:hover { color: var(--texto); }
+.planilha th .seta { color: var(--destaque); margin-left: 3px; }
+.planilha td { padding: 10px 12px; border-bottom: 1px solid var(--borda); vertical-align: middle; }
+.planilha tr:last-child td { border-bottom: 0; }
+.planilha tbody tr:hover td { background: var(--fundo); }
+.pessoa { display: flex; align-items: center; gap: 10px; min-width: 170px; }
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%; background: var(--destaque-suave); color: var(--destaque);
+  display: grid; place-items: center; font-weight: 700; font-size: 13px; flex: none;
+}
+.pessoa .nome-l { font-weight: 600; line-height: 1.2; }
+.pessoa a { font-size: 12.5px; text-decoration: none; }
+.pessoa .nome-l a { font-size: inherit; }
+.pessoa a:hover { text-decoration: underline; }
+.contato a { display: block; white-space: nowrap; text-decoration: none; font-size: 13px; }
+.vazio-cel { color: var(--texto-3); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.etiquetas { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; min-width: 140px; }
+.etiqueta { display: inline-flex; align-items: center; gap: 2px; background: var(--destaque-suave); color: var(--destaque); border-radius: 20px; padding: 1px 4px 1px 9px; font-size: 12px; font-weight: 550; }
+.etiqueta button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 3px; }
+.btn-etiqueta { border: 1px dashed var(--borda); background: none; color: var(--texto-2); border-radius: 20px; padding: 1px 9px; font-size: 12px; cursor: pointer; }
+.btn-etiqueta:hover { border-color: var(--destaque); color: var(--destaque); }
+.origem-comment { background: #F3E8FF; color: #6B21A8; border-color: transparent; }
+.origem-dm { background: var(--destaque-suave); color: var(--destaque); border-color: transparent; }
+.origem-story_reply { background: #FFF1E6; color: #9A3412; border-color: transparent; }
+.rodape-tabela { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 2px; flex-wrap: wrap; }
 
 /* ---------- Gráficos de barra ---------- */
 .grafico { position: relative; height: 150px; display: flex; align-items: flex-end; gap: 2px; padding-top: 10px; border-bottom: 1px solid var(--borda); }

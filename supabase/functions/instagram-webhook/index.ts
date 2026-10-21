@@ -6,8 +6,8 @@
 // Precisa ser PÚBLICA: publique com --no-verify-jwt.
 // =====================================================================
 import {
-  Automation, db, deliverAutomation, ENV, findStep, json, logDelivery, parsePayload,
-  replyToComment, sendStep, upsertLead,
+  Automation, completarPerfil, db, deliverAutomation, ENV, findStep, json, logDelivery, parsePayload,
+  registrarInteracao, replyToComment, sendStep, upsertLead,
 } from "../_shared/ig.ts";
 
 // ---------- Assinatura do Meta (HMAC SHA-256 com o APP_SECRET) ----------
@@ -98,6 +98,10 @@ async function handleComment(value: any) {
   if (!found) return;
   const { auto, keyword } = found;
 
+  // Conta a interação (cria o lead, mesmo que a regra do 1 por dia pule o envio)
+  await registrarInteracao(fromId, true);
+  if (username) await upsertLead(fromId, { username });
+
   // 4) regra do 1 por dia (contas de teste ignoram)
   const isTest = ENV.TEST_IG_ACCOUNTS.includes(fromId);
   if (!isTest && (await receivedToday(fromId))) {
@@ -143,6 +147,10 @@ async function handleMessage(ev: any) {
   }
 
   const source = msg?.reply_to?.story ? "story_reply" : "dm";
+
+  // Conta a interação (só de quem já é lead) e tenta completar nome e @
+  await registrarInteracao(senderId, false);
+  await completarPerfil(senderId);
 
   // ---- Toque em botão: postback OU quick_reply (trate os DOIS) ----
   const payload: string | undefined = postback?.payload ?? msg?.quick_reply?.payload;

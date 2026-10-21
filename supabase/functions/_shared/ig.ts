@@ -150,6 +150,25 @@ export async function upsertLead(ig_user_id: string, fields: Record<string, unkn
   });
 }
 
+// Soma 1 no contador de interações (criar = cria o lead se não existir)
+export async function registrarInteracao(igUserId: string, criar: boolean) {
+  const { error } = await db.rpc("registrar_interacao", { p_user: igUserId, p_criar: criar });
+  if (error) console.warn("[lead] registrar_interacao falhou (rodou o 06_interacoes.sql?):", error.message);
+}
+
+// Busca nome e @ do perfil. A API só libera depois que a pessoa
+// mandou mensagem pra conta, então é "melhor esforço".
+export async function completarPerfil(igUserId: string) {
+  const { data: lead } = await db.from("ig_leads").select("nome, username").eq("ig_user_id", igUserId).maybeSingle();
+  if (!lead || (lead.nome && lead.username)) return;
+  const r = await graphGet(`/${igUserId}`, { fields: "name,username" });
+  if (!r.ok) return;
+  const campos: Record<string, unknown> = {};
+  if (r.data?.name && !lead.nome) campos.nome = r.data.name;
+  if (r.data?.username && !lead.username) campos.username = r.data.username;
+  if (Object.keys(campos).length) await db.from("ig_leads").update(campos).eq("ig_user_id", igUserId);
+}
+
 async function rememberMid(mid?: string) {
   if (mid) await db.from("ig_bot_sends").upsert({ mid }, { onConflict: "mid" });
 }

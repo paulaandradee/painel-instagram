@@ -33,6 +33,9 @@ const ICONES = {
   grafico: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/>',
   arquivo: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/>',
+  grade: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  baixar: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
 };
 function icone(nome) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONES[nome] ?? ""}</svg>`;
@@ -98,6 +101,7 @@ const App = {
 // =====================================================================
 const CHAVE_AUTOS_LOCAL = "teste_local_automacoes";
 const CHAVE_ARQS_LOCAL = "teste_local_arquivos";
+const CHAVE_LEADS_LOCAL = "teste_local_leads";
 
 const Dados = {
   async automacoes() {
@@ -181,8 +185,63 @@ const Dados = {
     try {
       const { data, error } = await sb.functions.invoke("ig-media");
       if (error || !data?.ok) return null;
+      (data.posts ?? []).forEach((p) => { Dados._fotos[p.id] = p; });
       return data.posts ?? [];
     } catch { return null; }
+  },
+
+  // Fotos dos posts vinculados: { idDoPost: { miniatura, link, legenda } }
+  // Guarda em memória pra não buscar de novo a cada tela.
+  _fotos: {},
+  async miniaturas(ids) {
+    const faltam = [...new Set(ids)].filter((id) => !(id in Dados._fotos));
+    if (App.remoto && faltam.length) {
+      try {
+        for (let i = 0; i < faltam.length; i += 50) {
+          const { data } = await sb.functions.invoke("ig-media", { body: { ids: faltam.slice(i, i + 50) } });
+          (data?.posts ?? []).forEach((p) => { Dados._fotos[p.id] = p; });
+        }
+      } catch { /* sem foto, fica o ícone */ }
+    }
+    const r = {};
+    ids.forEach((id) => { if (Dados._fotos[id]) r[id] = Dados._fotos[id]; });
+    return r;
+  },
+
+  // Planilha de leads. O banco devolve no máximo 1000 linhas por vez: pagina.
+  async leads() {
+    if (!App.remoto) return memoria.ler(CHAVE_LEADS_LOCAL, []);
+    const todos = [];
+    for (let de = 0; ; de += 1000) {
+      const { data, error } = await sb.from("ig_leads_painel").select("*")
+        .order("updated_at", { ascending: false }).range(de, de + 999);
+      if (error) throw error;
+      todos.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+    return todos;
+  },
+
+  async salvarEtiquetas(igUserId, tags) {
+    if (!App.remoto) {
+      const lista = memoria.ler(CHAVE_LEADS_LOCAL, []);
+      const l = lista.find((x) => x.ig_user_id === igUserId);
+      if (l) l.tags = tags;
+      memoria.gravar(CHAVE_LEADS_LOCAL, lista);
+      return;
+    }
+    const { error } = await sb.from("ig_leads").update({ tags }).eq("ig_user_id", igUserId);
+    if (error) throw error;
+  },
+
+  // Exclusão (LGPD): apaga o lead e o histórico dele
+  async apagarLead(igUserId) {
+    if (!App.remoto) {
+      memoria.gravar(CHAVE_LEADS_LOCAL, memoria.ler(CHAVE_LEADS_LOCAL, []).filter((x) => x.ig_user_id !== igUserId));
+      return;
+    }
+    const { error } = await sb.rpc("apagar_dados_lead", { p_quem: igUserId });
+    if (error) throw error;
   },
 
   async arquivos() {
@@ -298,8 +357,10 @@ function trocarAba(aba) {
   $$(".aba").forEach((b) => b.classList.toggle("ativa", b.dataset.aba === aba));
   $("#aba-metricas").hidden = aba !== "metricas";
   $("#aba-automacoes").hidden = aba !== "automacoes";
+  $("#aba-interacoes").hidden = aba !== "interacoes";
   if (aba === "metricas") carregarMetricas();
   if (aba === "automacoes") carregarAutomacoes();
+  if (aba === "interacoes") window.Interacoes.carregar();
 }
 
 // =====================================================================
@@ -421,13 +482,20 @@ async function carregarAutomacoes() {
     const palavras = a.match_any
       ? `<span class="chip chip-destaque">Qualquer palavra</span>`
       : (a.keyword || "").split(",").map((k) => k.trim()).filter(Boolean).map((k) => `<span class="chip">${esc(k)}</span>`).join("");
+    // Foto do post vinculado (o primeiro; "+N" se tiver mais)
+    const medias = a.media_ids || [];
+    const thumb = medias.length
+      ? `<div class="thumb" data-thumb="${esc(medias[0])}" title="${medias.length} post${medias.length > 1 ? "s" : ""} vinculado${medias.length > 1 ? "s" : ""}">${icone("imagem")}${medias.length > 1 ? `<span class="mais">+${medias.length - 1}</span>` : ""}</div>`
+      : `<div class="thumb thumb-todos" title="Vale pra todos os posts">${icone("grade")}</div>`;
     return `
       <div class="cartao item-auto" data-id="${esc(a.id)}">
-        <label class="switch" title="Ligar ou desligar"><input type="checkbox" data-acao="ligar" ${a.active ? "checked" : ""}><span class="trilho"></span></label>
+        ${thumb}
         <div class="info">
           <div class="nome">${esc(a.nome || "Sem nome")}</div>
-          <div class="chips">${palavras || '<span class="chip">Sem palavra</span>'}</div>
+          <div class="chips">${palavras || '<span class="chip">Sem palavra</span>'}
+            <span class="chip">${medias.length ? `${medias.length} post${medias.length > 1 ? "s" : ""}` : "Todos os posts"}</span></div>
         </div>
+        <label class="switch" title="Ligar ou desligar"><input type="checkbox" data-acao="ligar" ${a.active ? "checked" : ""}><span class="trilho"></span></label>
         <span class="status ${a.active ? "on" : "off"}">${a.active ? "Ligada" : "Desligada"}</span>
         <button class="btn btn-p" data-acao="editar"><span data-icone="lapis"></span> Editar</button>
         <button class="btn btn-icone btn-fantasma btn-perigo" data-acao="apagar" aria-label="Apagar"><span data-icone="lixo"></span></button>
@@ -435,6 +503,20 @@ async function carregarAutomacoes() {
   }).join("");
   pintarIcones(alvo);
   alvo._lista = lista;
+
+  // Busca as fotos depois de desenhar (a lista aparece na hora, as fotos chegam em seguida)
+  const ids = lista.map((a) => (a.media_ids || [])[0]).filter(Boolean);
+  if (ids.length) {
+    Dados.miniaturas(ids).then((fotos) => {
+      $$("[data-thumb]", alvo).forEach((el) => {
+        const f = fotos[el.dataset.thumb];
+        if (!f?.miniatura) return;
+        el.querySelector("svg")?.remove();
+        el.insertAdjacentHTML("afterbegin", `<img src="${esc(f.miniatura)}" alt="${esc(f.legenda || "Post vinculado")}" loading="lazy">`);
+        if (f.link) { el.style.cursor = "pointer"; el.onclick = () => window.open(f.link, "_blank", "noopener"); }
+      });
+    });
+  }
 }
 
 $("#lista-automacoes").addEventListener("click", async (e) => {
