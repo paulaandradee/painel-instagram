@@ -169,14 +169,25 @@ const Dados = {
     return r;
   },
 
-  // Métricas do Instagram (função ig-insights). null = não conectado.
-  async insights() {
+  // Análises do Instagram (função ig-insights). null = não conectado.
+  // opcoes: { atualizar: true } busca de novo; { comentarios: true } monta o ranking
+  async analises(periodo, opcoes = {}) {
     if (!App.remoto) return null;
     try {
-      const { data, error } = await sb.functions.invoke("ig-insights");
+      const { data, error } = await sb.functions.invoke("ig-insights", {
+        body: { periodo, atualizar: !!opcoes.atualizar, comentarios: !!opcoes.comentarios },
+      });
       if (error || !data?.ok) return null;
       return data;
     } catch { return null; }
+  },
+
+  // DMs entregues nas últimas 24h
+  async entregas24h() {
+    if (!App.remoto) return 0;
+    const { count } = await sb.from("ig_deliveries").select("id", { count: "exact", head: true })
+      .eq("status", "ok").gte("ts", new Date(Date.now() - 864e5).toISOString());
+    return count ?? 0;
   },
 
   // Posts da conta (função ig-media). null = não conectado.
@@ -358,7 +369,7 @@ function trocarAba(aba) {
   $("#aba-metricas").hidden = aba !== "metricas";
   $("#aba-automacoes").hidden = aba !== "automacoes";
   $("#aba-interacoes").hidden = aba !== "interacoes";
-  if (aba === "metricas") carregarMetricas();
+  if (aba === "metricas") window.Analises.carregar();
   if (aba === "automacoes") carregarAutomacoes();
   if (aba === "interacoes") window.Interacoes.carregar();
 }
@@ -387,62 +398,6 @@ function graficoBarras(serie, rotulo) {
     </div>`).join("");
   return `<div class="grafico">${barras}</div>
     <div class="grafico-eixo"><span>${esc(fmtDia(serie[0].dia))}</span><span>${esc(fmtDia(serie[serie.length - 1].dia))}</span></div>`;
-}
-
-// Números fictícios só pra ver como fica (claramente marcados)
-function exemploFicticio() {
-  const hoje = new Date();
-  const dias = [...Array(15)].map((_, i) => {
-    const d = new Date(hoje.getTime() - (14 - i) * 864e5);
-    return d.toISOString().slice(0, 10);
-  });
-  return {
-    seguidores: 12480,
-    novos_seguidores: dias.map((dia, i) => ({ dia, valor: 20 + Math.round(15 * Math.sin(i / 2) + i * 2) })),
-    alcance: dias.map((dia, i) => ({ dia, valor: 1800 + Math.round(600 * Math.cos(i / 3) + i * 40) })),
-  };
-}
-
-async function carregarMetricas(forcarExemplo = false) {
-  const alvo = $("#aba-metricas");
-  alvo.innerHTML = `<div class="texto-2">Carregando...</div>`;
-  let leads = 0;
-  try { leads = (await Dados.contagens()).leads; } catch { /* zero */ }
-  const dados = forcarExemplo ? exemploFicticio() : await Dados.insights();
-
-  if (!dados) {
-    alvo.innerHTML = `
-      <div class="grade-cartoes" style="margin-bottom:16px">
-        <div class="cartao"><span class="rotulo">Leads captados</span><div class="numero">${leads.toLocaleString("pt-BR")}</div></div>
-      </div>
-      <div class="cartao vazio">
-        <div class="vazio-icone" data-icone="grafico"></div>
-        <h2 class="subtitulo">Conecte seu Instagram pra ver as métricas</h2>
-        <p>Assim que o Supabase e a API do Instagram estiverem configurados (veja o LEIA-ME), seguidores e alcance aparecem aqui.</p>
-        <button class="btn btn-p" id="ver-exemplo">Ver um exemplo com números fictícios</button>
-      </div>`;
-    pintarIcones(alvo);
-    $("#ver-exemplo").onclick = () => carregarMetricas(true);
-    return;
-  }
-
-  const novos = (dados.novos_seguidores ?? []).slice(-15);
-  const alcance = (dados.alcance ?? []).slice(-15);
-  const somaNovos = novos.reduce((s, p) => s + p.valor, 0);
-  alvo.innerHTML = `
-    ${forcarExemplo ? `<div class="faixa faixa-info" style="margin-bottom:16px"><span data-icone="info"></span><span>Exemplo com números fictícios, só pra visualizar. <a href="#" id="sair-exemplo">Voltar</a></span></div>` : ""}
-    <div class="grade-cartoes">
-      <div class="cartao"><span class="rotulo">Seguidores</span><div class="numero">${(dados.seguidores ?? 0).toLocaleString("pt-BR")}</div></div>
-      <div class="cartao"><span class="rotulo">Novos (15 dias)</span><div class="numero">${somaNovos.toLocaleString("pt-BR")}</div></div>
-      <div class="cartao"><span class="rotulo">Leads captados</span><div class="numero">${leads.toLocaleString("pt-BR")}</div></div>
-    </div>
-    <div class="grade-graficos">
-      <div class="cartao"><span class="rotulo">Novos seguidores por dia</span>${graficoBarras(novos, "novos seguidores")}</div>
-      <div class="cartao"><span class="rotulo">Alcance por dia</span>${graficoBarras(alcance, "contas alcançadas")}</div>
-    </div>`;
-  pintarIcones(alvo);
-  const voltar = $("#sair-exemplo");
-  if (voltar) voltar.onclick = (e) => { e.preventDefault(); carregarMetricas(); };
 }
 
 // Dica flutuante dos gráficos (hover)

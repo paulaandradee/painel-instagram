@@ -244,6 +244,57 @@ a { color: var(--destaque); }
 .origem-story_reply { background: #FFF1E6; color: #9A3412; border-color: transparent; }
 .rodape-tabela { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 2px; flex-wrap: wrap; }
 
+/* ---------- Análises ---------- */
+.an-topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.chips-periodo { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip-periodo {
+  border: 1px solid var(--borda); background: var(--superficie); color: var(--texto-2); border-radius: 20px;
+  padding: 5px 13px; font-size: 13px; font-weight: 550; cursor: pointer;
+}
+.chip-periodo:hover { color: var(--texto); border-color: var(--texto-3); }
+.chip-periodo.ativo { background: var(--destaque); border-color: var(--destaque); color: #fff; }
+.pilula {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--texto-2);
+  background: var(--superficie); border: 1px solid var(--borda); border-radius: 20px; padding: 4px 11px;
+}
+.ponto-on { width: 8px; height: 8px; border-radius: 50%; background: var(--sucesso); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.kpi { padding: 14px 16px; }
+.kpi .numero { font-size: 24px; margin: 0; color: var(--destaque); }
+.kpi-rotulo { font-size: 12.5px; color: var(--texto-2); }
+.kpis-mini { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; font-size: 13px; color: var(--texto-2); }
+.kpis-mini span, .stats span { display: inline-flex; align-items: center; gap: 5px; }
+.kpis-mini svg { width: 14px; height: 14px; }
+.carrossel-posts { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+.card-post {
+  flex: 0 0 168px; scroll-snap-align: start; border: 1px solid var(--borda); border-radius: var(--raio); overflow: hidden;
+  background: var(--superficie); color: var(--texto); text-decoration: none; transition: box-shadow .15s, transform .15s;
+}
+.card-post[href]:hover { box-shadow: var(--sombra-g); transform: translateY(-2px); }
+.capa { position: relative; aspect-ratio: 4 / 5; background: var(--superficie-2); }
+.capa img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.capa-vazia { width: 100%; height: 100%; display: grid; place-items: center; color: var(--texto-3); }
+.capa-vazia svg { width: 28px; height: 28px; }
+.selo-tipo, .selo-pos {
+  position: absolute; top: 6px; font-size: 11px; font-weight: 650; padding: 1px 7px; border-radius: 10px;
+  background: rgba(17,24,39,.72); color: #fff;
+}
+.selo-tipo { left: 6px; }
+.selo-pos { right: 6px; background: var(--destaque); }
+.card-dados { padding: 8px 10px 10px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; margin-top: 4px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.stats svg { width: 13px; height: 13px; color: var(--texto-3); flex: none; }
+.ranking { list-style: none; margin: 0; padding: 0; counter-reset: pos; display: grid; gap: 8px; }
+.ranking li { display: grid; grid-template-columns: 26px minmax(110px, 200px) 1fr 44px; align-items: center; gap: 10px; counter-increment: pos; font-size: 13.5px; }
+.ranking li::before { content: counter(pos) "º"; color: var(--texto-3); font-weight: 650; font-size: 12.5px; }
+.ranking a { text-decoration: none; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barra-rank { height: 8px; background: var(--superficie-2); border-radius: 4px; overflow: hidden; }
+.barra-rank span { display: block; height: 100%; background: var(--destaque); border-radius: 4px; }
+@media (max-width: 600px) {
+  .ranking li { grid-template-columns: 24px 1fr 40px; }
+  .barra-rank { display: none; }
+}
+
 /* ---------- Gráficos de barra ---------- */
 .grafico { position: relative; height: 150px; display: flex; align-items: flex-end; gap: 2px; padding-top: 10px; border-bottom: 1px solid var(--borda); }
 .grafico .barra-alvo { flex: 1; height: 100%; display: flex; align-items: flex-end; cursor: default; }
