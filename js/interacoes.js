@@ -143,10 +143,10 @@
     alvo.innerHTML = `
       ${exemplo ? `<div class="faixa faixa-info" style="margin-bottom:16px"><span data-icone="info"></span><span>Exemplo com dados fictícios, só pra visualizar. Mudanças aqui não são salvas. <a href="#" data-acao="sair-exemplo">Voltar</a></span></div>` : ""}
       <div class="resumo-mini">
-        <div class="cartao"><span class="rotulo">Leads</span><div class="numero">${leads.length.toLocaleString("pt-BR")}</div></div>
-        <div class="cartao"><span class="rotulo">Com contato</span><div class="numero">${comContato.toLocaleString("pt-BR")}</div></div>
-        <div class="cartao"><span class="rotulo">Novos (7 dias)</span><div class="numero">${novos.toLocaleString("pt-BR")}</div></div>
-        <div class="cartao"><span class="rotulo">Interações</span><div class="numero">${totalInter.toLocaleString("pt-BR")}</div></div>
+        <div class="cartao kpi"><div class="numero">${leads.length.toLocaleString("pt-BR")}</div><span class="kpi-rotulo">Leads</span></div>
+        <div class="cartao kpi"><div class="numero">${comContato.toLocaleString("pt-BR")}</div><span class="kpi-rotulo">Com contato</span></div>
+        <div class="cartao kpi"><div class="numero">${novos.toLocaleString("pt-BR")}</div><span class="kpi-rotulo">Novos (7 dias)</span></div>
+        <div class="cartao kpi"><div class="numero">${totalInter.toLocaleString("pt-BR")}</div><span class="kpi-rotulo">Interações</span></div>
       </div>
       <div class="barra-ferramentas">
         <input class="input" id="int-busca" type="search" placeholder="Buscar por nome, @, e-mail, telefone, palavra..." value="${esc(filtro.texto)}" aria-label="Buscar">

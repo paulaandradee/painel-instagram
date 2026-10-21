@@ -52,15 +52,18 @@
 
   <!-- Menu lateral -->
   <aside class="lateral" id="lateral">
-    <div class="marca"><span class="marca-icone" data-icone="raio"></span> Seu Painel</div>
+    <div class="marca">
+      <span class="marca-icone" data-icone="raio"></span> <span class="marca-texto">Seu Painel</span>
+      <button class="btn-recolher" id="btn-recolher" aria-label="Recolher o menu" title="Recolher o menu"><span data-icone="voltar"></span></button>
+    </div>
     <nav class="menu">
-      <a class="menu-item" href="#inicio" data-rota="inicio"><span data-icone="casa"></span> Início</a>
-      <a class="menu-item" href="#calendario" data-rota="calendario"><span data-icone="calendario"></span> Calendário</a>
-      <a class="menu-item" href="#instagram" data-rota="instagram"><span data-icone="instagram"></span> Instagram</a>
+      <a class="menu-item" href="#inicio" data-rota="inicio" title="Início"><span data-icone="casa"></span> <span class="txt">Início</span></a>
+      <a class="menu-item" href="#calendario" data-rota="calendario" title="Calendário"><span data-icone="calendario"></span> <span class="txt">Calendário</span></a>
+      <a class="menu-item" href="#instagram" data-rota="instagram" title="Instagram"><span data-icone="instagram"></span> <span class="txt">Instagram</span></a>
     </nav>
     <div class="rodape-lateral">
       <div class="usuario" id="usuario-email"></div>
-      <button class="menu-item" id="btn-sair"><span data-icone="sair"></span> Sair</button>
+      <button class="menu-item" id="btn-sair" title="Sair"><span data-icone="sair"></span> <span class="txt">Sair</span></button>
     </div>
   </aside>
 
@@ -74,14 +77,14 @@
     <section class="secao" id="secao-inicio" hidden>
       <div class="cabecalho">
         <div>
-          <h1 class="titulo">Bem-vindo ao seu painel</h1>
+          <h1 class="titulo">👋 Bem-vindo ao seu painel</h1>
           <p class="texto-2" style="margin:4px 0 0">Uma visão rápida do que está acontecendo.</p>
         </div>
       </div>
       <div class="grade-cartoes">
-        <div class="cartao"><span class="rotulo">Leads captados</span><div class="numero" id="n-leads">0</div></div>
-        <div class="cartao"><span class="rotulo">Automações ativas</span><div class="numero" id="n-ativas">0</div></div>
-        <div class="cartao"><span class="rotulo">DMs enviadas (7 dias)</span><div class="numero" id="n-dms">0</div></div>
+        <div class="cartao kpi"><div class="numero" id="n-leads">0</div><span class="kpi-rotulo">Leads captados</span></div>
+        <div class="cartao kpi"><div class="numero" id="n-ativas">0</div><span class="kpi-rotulo">Automações ativas</span></div>
+        <div class="cartao kpi"><div class="numero" id="n-dms">0</div><span class="kpi-rotulo">DMs enviadas (7 dias)</span></div>
       </div>
       <h2 class="subtitulo" style="margin:28px 0 12px">Atalhos</h2>
       <div class="linha">
@@ -105,14 +108,15 @@
     <section class="secao" id="secao-instagram" hidden>
       <div class="cabecalho">
         <div>
-          <h1 class="titulo">Instagram</h1>
-          <p class="texto-2" style="margin:4px 0 0">Métricas da conta e respostas automáticas no direct.</p>
+          <h1 class="titulo">📸 Instagram</h1>
+          <p class="texto-2" style="margin:4px 0 0">Análises da conta e respostas automáticas no direct.</p>
         </div>
+        <div class="pilulas-status" id="ig-status"></div>
       </div>
       <div class="abas">
-        <button class="aba" data-aba="metricas">Análises</button>
-        <button class="aba" data-aba="automacoes">Automações</button>
-        <button class="aba" data-aba="interacoes">Interações</button>
+        <button class="aba" data-aba="metricas">📊 Análises</button>
+        <button class="aba" data-aba="automacoes">⚡ Automações</button>
+        <button class="aba" data-aba="interacoes">👥 Interações</button>
       </div>
 
       <div id="aba-interacoes" hidden></div>

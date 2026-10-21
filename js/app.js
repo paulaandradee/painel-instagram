@@ -175,11 +175,18 @@ const Dados = {
     if (!App.remoto) return null;
     try {
       const { data, error } = await sb.functions.invoke("ig-insights", {
-        body: { periodo, atualizar: !!opcoes.atualizar, comentarios: !!opcoes.comentarios },
+        body: { periodo, atualizar: !!opcoes.atualizar, comentarios: !!opcoes.comentarios, escopo: opcoes.escopo || "periodo" },
       });
       if (error || !data?.ok) return null;
       return data;
     } catch { return null; }
+  },
+
+  // Validade do token do Instagram (gravada pela renovação automática)
+  async tokenStatus() {
+    if (!App.remoto) return null;
+    const { data } = await sb.from("ig_token_status").select("expires_at, last_ok").eq("id", "main").maybeSingle();
+    return data ?? null;
   },
 
   // DMs entregues nas últimas 24h
@@ -359,7 +366,25 @@ function navegar() {
   $$(".menu-item[data-rota]").forEach((m) => m.classList.toggle("ativo", m.dataset.rota === valida));
   $("#lateral").classList.remove("aberta");
   if (valida === "inicio") carregarInicio();
-  if (valida === "instagram") trocarAba(abaInstagram);
+  if (valida === "instagram") { trocarAba(abaInstagram); carregarStatusIg(); }
+}
+
+// Pílulas no topo da seção Instagram: validade do token e entregas em 24h
+async function carregarStatusIg() {
+  const alvo = $("#ig-status");
+  if (!App.remoto) { alvo.innerHTML = ""; return; }
+  let token = null, entregas = 0;
+  try { [token, entregas] = await Promise.all([Dados.tokenStatus(), Dados.entregas24h()]); } catch { /* sem pílulas */ }
+  let pilulaToken = "";
+  if (token?.expires_at) {
+    const dias = Math.ceil((new Date(token.expires_at).getTime() - Date.now()) / 864e5);
+    const nivel = dias <= 3 ? "erro" : dias <= 14 ? "atencao" : "";
+    const texto = dias > 0 ? `Token ${dias} dia${dias === 1 ? "" : "s"}` : "Token vencido";
+    pilulaToken = `<span class="pilula-status ${nivel}" title="Validade do acesso ao Instagram. A renovação é automática toda semana."><span class="ponto"></span>${texto}</span>`;
+  } else if (token?.last_ok === false) {
+    pilulaToken = `<span class="pilula-status erro"><span class="ponto"></span>Token com erro</span>`;
+  }
+  alvo.innerHTML = `${pilulaToken}<span class="pilula-status" title="DMs entregues nas últimas 24 horas">✉️ ${entregas.toLocaleString("pt-BR")} entrega${entregas === 1 ? "" : "s"} 24h</span>`;
 }
 
 function trocarAba(aba) {
@@ -396,7 +421,9 @@ function graficoBarras(serie, rotulo) {
     <div class="barra-alvo" data-dica="${esc(fmtDia(p.dia))}: ${p.valor.toLocaleString("pt-BR")} ${esc(rotulo)}">
       <div class="barra" style="height:${Math.max(1.5, (p.valor / max) * 100)}%"></div>
     </div>`).join("");
-  return `<div class="grafico">${barras}</div>
+  // muitas barras (1 ano) = espaço menor entre elas, senão somem
+  const espaco = serie.length > 120 ? 0 : serie.length > 45 ? 1 : 3;
+  return `<div class="grafico" style="gap:${espaco}px">${barras}</div>
     <div class="grafico-eixo"><span>${esc(fmtDia(serie[0].dia))}</span><span>${esc(fmtDia(serie[serie.length - 1].dia))}</span></div>`;
 }
 
@@ -508,6 +535,14 @@ async function iniciar() {
   $("#form-login").addEventListener("submit", aoEnviarLogin);
   $("#btn-sair").addEventListener("click", sair);
   $("#btn-menu").addEventListener("click", () => $("#lateral").classList.toggle("aberta"));
+  // Menu lateral recolhível (lembra a escolha)
+  $("#app").classList.toggle("recolhido", memoria.ler("menu_recolhido", false));
+  $("#btn-recolher").addEventListener("click", () => {
+    const r = !$("#app").classList.contains("recolhido");
+    $("#app").classList.toggle("recolhido", r);
+    $("#btn-recolher").setAttribute("aria-label", r ? "Abrir o menu" : "Recolher o menu");
+    memoria.gravar("menu_recolhido", r);
+  });
   $$(".aba").forEach((b) => b.addEventListener("click", () => trocarAba(b.dataset.aba)));
   $("#btn-nova").addEventListener("click", () => window.Editor.abrir(null));
   $("#atalho-nova").addEventListener("click", () => { location.hash = "#instagram"; trocarAba("automacoes"); window.Editor.abrir(null); });
