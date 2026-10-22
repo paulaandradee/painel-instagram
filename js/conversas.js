@@ -572,7 +572,7 @@
     if (!atual || atual.status !== "arquivada") return;
     const ok = await confirmar(
       "Excluir esta conversa?",
-      `A conversa com ${nomeDe(atual)} e as mensagens dela saem do painel para todo o time. No Instagram ela continua, e o Relatório não muda. Se a pessoa escrever de novo, a conversa volta do zero.`,
+      `A conversa com ${nomeDe(atual)} e as mensagens dela saem do painel para todo o time, e os atendimentos de Direct dela saem do Relatório (conversa pessoal, não de trabalho). No Instagram ela continua. Se a pessoa escrever de novo e for respondida, volta a contar.`,
       "Excluir", true,
     );
     if (!ok) return;

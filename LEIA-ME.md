@@ -355,7 +355,7 @@ pronto, publicado) e as etapas gravar, editar, legenda e publicado.
 
 ### Excluir conversas
 
-Rode `supabase/sql/14_excluir_conversas.sql`. Conversas **arquivadas** ganham o botão **Excluir**: a conversa, as mensagens e as sugestões saem do painel. No Instagram ela continua, e o Relatório não muda. Se a pessoa escrever de novo, a conversa volta do zero.
+Rode `supabase/sql/14_excluir_conversas.sql` e `16_excluir_tira_do_relatorio.sql`. Conversas **arquivadas** ganham o botão **Excluir**: a conversa, as mensagens e as sugestões saem do painel, e os atendimentos de **Direct** da pessoa saem do Relatório (excluir = conversa pessoal, não de trabalho). Os de comentário ficam. No Instagram ela continua; se a pessoa escrever de novo e for respondida, volta a contar.
 
 ### Respostas manuais no Relatório
 
