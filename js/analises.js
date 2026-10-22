@@ -84,7 +84,7 @@
     else marcarCarregando(opcoes.comentarios ? "comentarios" : opcoes.atualizar ? "tudo" : null);
 
     let leads = 0;
-    try { leads = (await Dados.contagens()).leads; } catch { /* zero */ }
+    try { leads = (await Dados.contagens(App.conta?.id)).leads; } catch { /* zero */ }
 
     const resultado = exemplo ? dadosExemplo(periodo, escopo) : await Dados.analises(periodo, { ...opcoes, escopo });
     if (meu !== pedidoAtual) return; // chegou um pedido mais novo: descarta este
@@ -265,5 +265,8 @@
     if (acao === "comentarios") return carregar({ comentarios: true });
   });
 
-  window.Analises = { carregar: () => carregar({ trocouPeriodo: !dados }) };
+  window.Analises = {
+    carregar: () => carregar({ trocouPeriodo: !dados }),
+    reset: () => { dados = null; exemplo = false; }, // trocou de conta: esquece o que estava na tela
+  };
 })();

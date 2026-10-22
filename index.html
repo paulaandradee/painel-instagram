@@ -60,6 +60,7 @@
       <a class="menu-item" href="#inicio" data-rota="inicio" title="Início"><span data-icone="casa"></span> <span class="txt">Início</span></a>
       <a class="menu-item" href="#calendario" data-rota="calendario" title="Calendário"><span data-icone="calendario"></span> <span class="txt">Calendário</span></a>
       <a class="menu-item" href="#instagram" data-rota="instagram" title="Instagram"><span data-icone="instagram"></span> <span class="txt">Instagram</span></a>
+      <a class="menu-item" href="#acessos" data-rota="acessos" id="menu-acessos" title="Contas e acessos" hidden><span data-icone="cadeado"></span> <span class="txt">Contas e acessos</span></a>
       <!-- Atalhos externos: abrem numa aba nova -->
       <span class="menu-grupo">Atalhos</span>
       <a class="menu-item" href="https://claude.ai/artifact/1ZLL6HH4AVw84o8bi8NqWe" target="_blank" rel="noopener noreferrer" title="Jardim MultiMeta (abre numa aba nova)"><span data-icone="jardim"></span> <span class="txt">Jardim MultiMeta <span class="externo" aria-hidden="true">↗</span></span></a>
@@ -121,6 +122,13 @@
         </div>
         <div class="pilulas-status" id="ig-status"></div>
       </div>
+      <!-- Seletor de conta (só aparece com mais de uma conta) -->
+      <div id="ig-contas" style="margin:-8px 0 16px"></div>
+      <div id="ig-sem-conta" class="cartao vazio" hidden>
+        <div class="vazio-icone" data-icone="instagram"></div>
+        <h2 class="subtitulo">Nenhuma conta de Instagram liberada pra você</h2>
+        <p>Peça para a administradora do painel liberar o acesso à sua conta em "Contas e acessos".</p>
+      </div>
       <div class="abas">
         <button class="aba" data-aba="metricas">📊 Análises</button>
         <button class="aba" data-aba="automacoes">⚡ Automações</button>
@@ -138,6 +146,16 @@
         </div>
         <div id="lista-automacoes" class="lista-auto"></div>
       </div>
+    </section>
+    <!-- CONTAS E ACESSOS (só administradoras) -->
+    <section class="secao" id="secao-acessos" hidden>
+      <div class="cabecalho">
+        <div>
+          <h1 class="titulo">🔐 Contas e acessos</h1>
+          <p class="texto-2" style="margin:4px 0 0">Conecte contas de Instagram e escolha quem vê cada uma.</p>
+        </div>
+      </div>
+      <div id="acessos-corpo"></div>
     </section>
   </main>
 </div>
@@ -268,5 +286,6 @@
 <script src="js/interacoes.js"></script>
 <script src="js/analises.js"></script>
 <script src="js/repescagem.js"></script>
+<script src="js/acessos.js"></script>
 </body>
 </html>

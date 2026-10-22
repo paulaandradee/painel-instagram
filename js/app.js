@@ -37,6 +37,7 @@ const ICONES = {
   baixar: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   crm: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 16v-3M11 16v-6M15 16v-4M19 16V8"/><path d="M3 8h18"/>',
   notion: '<path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4M8 12h8M8 16h5"/>',
+  cadeado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   repescar: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/>',
   jardim: '<path d="M12 21v-8"/><path d="M12 17c-2.6-.2-4-1.4-4.6-3.2M12 16c2.4-.2 3.8-1.2 4.4-2.8"/><path d="M6.5 4c0 5 1.2 9 5.5 9s5.5-4 5.5-9c-1.6.5-2.8 1.3-3.4 2.4C13.4 5 12.8 4 12 3.2 11.2 4 10.6 5 10 6.4 9.4 5.3 8.1 4.5 6.5 4z"/>',
   pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
@@ -98,7 +99,13 @@ try {
 const App = {
   usuario: null,
   remoto: false, // true = lê e grava no Supabase; false = modo de teste local (navegador)
+  contas: [],    // contas de Instagram que esta pessoa pode ver
+  conta: null,   // a conta escolhida no momento
+  admin: false,  // administradora: conecta contas e libera pessoas
 };
+
+// Filtra uma consulta pela conta, se houver
+const daConta = (consulta, contaId) => (contaId ? consulta.eq("conta_id", contaId) : consulta);
 
 // =====================================================================
 // CAMADA DE DADOS: toda chamada é tolerante a falha
@@ -108,9 +115,36 @@ const CHAVE_ARQS_LOCAL = "teste_local_arquivos";
 const CHAVE_LEADS_LOCAL = "teste_local_leads";
 
 const Dados = {
+  // Contas que a pessoa pode ver (o banco só devolve as liberadas pra ela)
+  async contas() {
+    if (!App.remoto) return [{ id: "local", username: "sua_conta", nome: "Conta de teste" }];
+    const { data } = await sb.from("ig_contas").select("id, username, nome, ativo").eq("ativo", true).order("criado_em");
+    return data ?? [];
+  },
+
+  async souAdmin() {
+    if (!App.remoto) return false;
+    const { data } = await sb.from("painel_admins").select("user_id").eq("user_id", App.usuario.id).maybeSingle();
+    return !!data;
+  },
+
+  // Contas e acessos (função painel-admin, só administradoras)
+  async admin(acao, extra = {}) {
+    if (!App.remoto) return null;
+    try {
+      const { data, error } = await sb.functions.invoke("painel-admin", { body: { acao, ...extra } });
+      if (error) {
+        let msg = "Não foi possível falar com o servidor agora.";
+        try { const corpo = await error.context?.json?.(); if (corpo?.erro) msg = corpo.erro; } catch { /* mantém */ }
+        return { ok: false, erro: msg };
+      }
+      return data;
+    } catch { return { ok: false, erro: "Não foi possível falar com o servidor agora." }; }
+  },
+
   async automacoes() {
     if (!App.remoto) return memoria.ler(CHAVE_AUTOS_LOCAL, []);
-    const { data, error } = await sb.from("ig_automations").select("*").order("updated_at", { ascending: false });
+    const { data, error } = await sb.from("ig_automations").select("*").eq("conta_id", App.conta.id).order("updated_at", { ascending: false });
     if (error) throw error;
     return data ?? [];
   },
@@ -128,6 +162,7 @@ const Dados = {
     const linha = { ...a };
     if (!linha.id) delete linha.id;
     delete linha.created_at; delete linha.updated_at;
+    linha.conta_id = linha.conta_id || App.conta.id; // toda automação é de uma conta
     const { data, error } = await sb.from("ig_automations").upsert(linha).select().single();
     if (error) throw error;
     return { automacao: data, local: false };
@@ -155,7 +190,8 @@ const Dados = {
   },
 
   // Números do Início. Qualquer falha vira zero.
-  async contagens() {
+  // contaId: só desta conta (Análises, Interações). Sem contaId: todas as contas que a pessoa acessa (Início).
+  async contagens(contaId) {
     const r = { leads: 0, ativas: 0, dms7: 0 };
     if (!App.remoto) {
       r.ativas = memoria.ler(CHAVE_AUTOS_LOCAL, []).filter((a) => a.active).length;
@@ -163,9 +199,9 @@ const Dados = {
     }
     const seteDias = new Date(Date.now() - 7 * 864e5).toISOString();
     const [leads, ativas, dms] = await Promise.allSettled([
-      sb.from("ig_leads").select("ig_user_id", { count: "exact", head: true }),
-      sb.from("ig_automations").select("id", { count: "exact", head: true }).eq("active", true),
-      sb.from("ig_deliveries").select("id", { count: "exact", head: true }).eq("status", "ok").gte("ts", seteDias),
+      daConta(sb.from("ig_leads").select("ig_user_id", { count: "exact", head: true }), contaId),
+      daConta(sb.from("ig_automations").select("id", { count: "exact", head: true }).eq("active", true), contaId),
+      daConta(sb.from("ig_deliveries").select("id", { count: "exact", head: true }).eq("status", "ok").gte("ts", seteDias), contaId),
     ]);
     r.leads = leads.value?.count ?? 0;
     r.ativas = ativas.value?.count ?? 0;
@@ -179,7 +215,7 @@ const Dados = {
     if (!App.remoto) return null;
     try {
       const { data, error } = await sb.functions.invoke("ig-insights", {
-        body: { periodo, atualizar: !!opcoes.atualizar, comentarios: !!opcoes.comentarios, escopo: opcoes.escopo || "periodo" },
+        body: { conta_id: App.conta.id, periodo, atualizar: !!opcoes.atualizar, comentarios: !!opcoes.comentarios, escopo: opcoes.escopo || "periodo" },
       });
       if (error || !data?.ok) return null;
       return data;
@@ -189,8 +225,8 @@ const Dados = {
   // Validade do token do Instagram (gravada pela renovação automática)
   async tokenStatus() {
     if (!App.remoto) return null;
-    const { data } = await sb.from("ig_token_status").select("expires_at, last_ok").eq("id", "main").maybeSingle();
-    return data ?? null;
+    const { data } = await sb.from("ig_contas").select("token_expira_em, token_ok").eq("id", App.conta.id).maybeSingle();
+    return data ? { expires_at: data.token_expira_em, last_ok: data.token_ok } : null;
   },
 
   // Repescagem (função ig-repescagem). acao: "previa" ou "enviar". null = não conectado.
@@ -209,7 +245,7 @@ const Dados = {
   async entregas24h() {
     if (!App.remoto) return 0;
     const { count } = await sb.from("ig_deliveries").select("id", { count: "exact", head: true })
-      .eq("status", "ok").gte("ts", new Date(Date.now() - 864e5).toISOString());
+      .eq("conta_id", App.conta.id).eq("status", "ok").gte("ts", new Date(Date.now() - 864e5).toISOString());
     return count ?? 0;
   },
 
@@ -217,7 +253,7 @@ const Dados = {
   async posts() {
     if (!App.remoto) return null;
     try {
-      const { data, error } = await sb.functions.invoke("ig-media");
+      const { data, error } = await sb.functions.invoke("ig-media", { body: { conta_id: App.conta.id } });
       if (error || !data?.ok) return null;
       (data.posts ?? []).forEach((p) => { Dados._fotos[p.id] = p; });
       return data.posts ?? [];
@@ -232,7 +268,7 @@ const Dados = {
     if (App.remoto && faltam.length) {
       try {
         for (let i = 0; i < faltam.length; i += 50) {
-          const { data } = await sb.functions.invoke("ig-media", { body: { ids: faltam.slice(i, i + 50) } });
+          const { data } = await sb.functions.invoke("ig-media", { body: { conta_id: App.conta.id, ids: faltam.slice(i, i + 50) } });
           (data?.posts ?? []).forEach((p) => { Dados._fotos[p.id] = p; });
         }
       } catch { /* sem foto, fica o ícone */ }
@@ -247,7 +283,7 @@ const Dados = {
     if (!App.remoto) return memoria.ler(CHAVE_LEADS_LOCAL, []);
     const todos = [];
     for (let de = 0; ; de += 1000) {
-      const { data, error } = await sb.from("ig_leads_painel").select("*")
+      const { data, error } = await sb.from("ig_leads_painel").select("*").eq("conta_id", App.conta.id)
         .order("updated_at", { ascending: false }).range(de, de + 999);
       if (error) throw error;
       todos.push(...(data ?? []));
@@ -264,7 +300,7 @@ const Dados = {
       memoria.gravar(CHAVE_LEADS_LOCAL, lista);
       return;
     }
-    const { error } = await sb.from("ig_leads").update({ tags }).eq("ig_user_id", igUserId);
+    const { error } = await sb.from("ig_leads").update({ tags }).eq("conta_id", App.conta.id).eq("ig_user_id", igUserId);
     if (error) throw error;
   },
 
@@ -274,13 +310,13 @@ const Dados = {
       memoria.gravar(CHAVE_LEADS_LOCAL, memoria.ler(CHAVE_LEADS_LOCAL, []).filter((x) => x.ig_user_id !== igUserId));
       return;
     }
-    const { error } = await sb.rpc("apagar_dados_lead", { p_quem: igUserId });
+    const { error } = await sb.rpc("apagar_dados_lead", { p_conta: App.conta.id, p_quem: igUserId });
     if (error) throw error;
   },
 
   async arquivos() {
     if (!App.remoto) return memoria.ler(CHAVE_ARQS_LOCAL, []);
-    const { data, error } = await sb.from("ig_assets").select("*").order("created_at", { ascending: false });
+    const { data, error } = await sb.from("ig_assets").select("*").eq("conta_id", App.conta.id).order("created_at", { ascending: false });
     if (error) throw error;
     return data ?? [];
   },
@@ -293,7 +329,7 @@ const Dados = {
       memoria.gravar(CHAVE_ARQS_LOCAL, lista);
       return item;
     }
-    const { data, error } = await sb.from("ig_assets").insert(a).select().single();
+    const { data, error } = await sb.from("ig_assets").insert({ ...a, conta_id: App.conta.id }).select().single();
     if (error) throw error;
     return data;
   },
@@ -357,7 +393,40 @@ function entrar(usuario) {
   $("#aviso-modo-local").hidden = App.remoto;
   $("#login-senha").value = "";
   if (!location.hash) location.hash = "#inicio";
-  navegar();
+  prepararContas().then(navegar);
+}
+
+// Carrega as contas da pessoa, a conta escolhida e se ela é administradora
+async function prepararContas() {
+  try { [App.contas, App.admin] = await Promise.all([Dados.contas(), Dados.souAdmin()]); }
+  catch { App.contas = []; App.admin = false; }
+  const salva = memoria.ler("conta_atual", null);
+  App.conta = App.contas.find((c) => c.id === salva) || App.contas[0] || null;
+  $("#menu-acessos").hidden = !App.admin;
+  renderSeletorConta();
+}
+
+// Seletor no topo da seção Instagram (só aparece com mais de uma conta)
+function renderSeletorConta() {
+  const alvo = $("#ig-contas");
+  const semConta = !App.conta;
+  $("#ig-sem-conta").hidden = !semConta;
+  $(".abas").hidden = semConta;
+  if (App.contas.length < 2) { alvo.innerHTML = ""; return; }
+  alvo.innerHTML = `<div class="segmentado seletor-conta" role="group" aria-label="Conta de Instagram">${App.contas.map((c) =>
+    `<button class="${c.id === App.conta?.id ? "ativo" : ""}" data-conta="${esc(c.id)}" aria-pressed="${c.id === App.conta?.id}">@${esc(c.username || "conta")}</button>`).join("")}</div>`;
+}
+
+function trocarConta(id) {
+  const c = App.contas.find((x) => x.id === id);
+  if (!c || c.id === App.conta?.id) return;
+  App.conta = c;
+  memoria.gravar("conta_atual", c.id);
+  window.Analises?.reset();   // análises guardadas eram da outra conta
+  window.Editor?.limparPosts(); // posts do seletor eram da outra conta
+  renderSeletorConta();
+  trocarAba(abaInstagram);
+  carregarStatusIg();
 }
 
 async function sair() {
@@ -377,18 +446,20 @@ let abaInstagram = memoria.ler("aba_instagram", "automacoes");
 function navegar() {
   if (!App.usuario) return;
   const rota = (location.hash || "#inicio").slice(1);
-  const valida = ["inicio", "calendario", "instagram"].includes(rota) ? rota : "inicio";
+  const rotas = ["inicio", "calendario", "instagram"].concat(App.admin ? ["acessos"] : []);
+  const valida = rotas.includes(rota) ? rota : "inicio";
   $$(".secao").forEach((s) => (s.hidden = s.id !== `secao-${valida}`));
   $$(".menu-item[data-rota]").forEach((m) => m.classList.toggle("ativo", m.dataset.rota === valida));
   $("#lateral").classList.remove("aberta");
   if (valida === "inicio") carregarInicio();
-  if (valida === "instagram") { trocarAba(abaInstagram); carregarStatusIg(); }
+  if (valida === "instagram" && App.conta) { trocarAba(abaInstagram); carregarStatusIg(); }
+  if (valida === "acessos") window.Acessos.carregar();
 }
 
 // Pílulas no topo da seção Instagram: validade do token e entregas em 24h
 async function carregarStatusIg() {
   const alvo = $("#ig-status");
-  if (!App.remoto) { alvo.innerHTML = ""; return; }
+  if (!App.remoto || !App.conta) { alvo.innerHTML = ""; return; }
   let token = null, entregas = 0;
   try { [token, entregas] = await Promise.all([Dados.tokenStatus(), Dados.entregas24h()]); } catch { /* sem pílulas */ }
   let pilulaToken = "";
@@ -562,6 +633,7 @@ async function iniciar() {
     memoria.gravar("menu_recolhido", r);
   });
   $$(".aba").forEach((b) => b.addEventListener("click", () => trocarAba(b.dataset.aba)));
+  $("#ig-contas").addEventListener("click", (e) => { const b = e.target.closest("[data-conta]"); if (b) trocarConta(b.dataset.conta); });
   $("#btn-nova").addEventListener("click", () => window.Editor.abrir(null));
   $("#atalho-nova").addEventListener("click", () => { location.hash = "#instagram"; trocarAba("automacoes"); window.Editor.abrir(null); });
   window.addEventListener("hashchange", navegar);

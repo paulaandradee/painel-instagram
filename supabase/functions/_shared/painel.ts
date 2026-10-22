@@ -1,10 +1,11 @@
 // =====================================================================
 // _shared/painel.ts
-// Ajudas pras funções chamadas pelo PAINEL (ig-insights, ig-media):
-// CORS e checagem de que quem chama está logado.
+// Ajudas pras funções chamadas pelo PAINEL (ig-insights, ig-media,
+// ig-repescagem, painel-admin): CORS, quem está logado e se essa pessoa
+// tem acesso à conta pedida.
 // =====================================================================
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { ENV } from "./ig.ts";
+import { Conta, contaPorId, db, ENV } from "./ig.ts";
 
 export const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -12,14 +13,28 @@ export const CORS = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
-// Só deixa passar quem está logado no painel (a chave anônima sozinha não basta)
-export async function requireUser(req: Request): Promise<boolean> {
+// Devolve o id de quem está logado no painel (ou null).
+// A chave anônima sozinha não basta.
+export async function requireUser(req: Request): Promise<string | null> {
   const auth = req.headers.get("Authorization") ?? "";
   const jwt = auth.replace(/^Bearer\s+/i, "");
-  if (!jwt) return false;
+  if (!jwt) return null;
   const client = createClient(ENV.SUPABASE_URL, ENV.SERVICE_ROLE, { auth: { persistSession: false } });
   const { data, error } = await client.auth.getUser(jwt);
-  return !error && !!data?.user;
+  return !error && data?.user ? data.user.id : null;
+}
+
+export async function ehAdmin(userId: string): Promise<boolean> {
+  const { data } = await db.from("painel_admins").select("user_id").eq("user_id", userId).maybeSingle();
+  return !!data;
+}
+
+// A conta, se a pessoa tiver acesso a ela (membro); senão null
+export async function contaDoUsuario(userId: string, contaId: string): Promise<Conta | null> {
+  if (!contaId) return null;
+  const { data } = await db.from("ig_membros").select("conta_id").eq("user_id", userId).eq("conta_id", contaId).maybeSingle();
+  if (!data) return null;
+  return contaPorId(contaId);
 }
 
 export function reply(body: unknown, status = 200) {

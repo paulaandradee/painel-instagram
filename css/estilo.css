@@ -484,6 +484,18 @@ details.avancado .grade2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8
 .modal { width: 100%; max-width: 420px; }
 .modal-largo { max-width: 560px; max-height: calc(100vh - 32px); overflow-y: auto; }
 
+/* ---------- Contas e acessos ---------- */
+.ac-linha { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--borda); flex-wrap: wrap; }
+.ac-linha:first-of-type { border-top: 0; }
+.ac-info { flex: 1; min-width: 180px; }
+.ac-checks { display: grid; gap: 6px; }
+.ac-check { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--borda); border-radius: var(--raio-p); cursor: pointer; }
+.ac-check input { accent-color: var(--destaque); width: 16px; height: 16px; }
+.ac-passos { margin: 0 0 14px; padding-left: 20px; color: var(--texto-2); }
+.ac-passos li { margin-bottom: 6px; }
+.ac-credenciais { background: var(--superficie-2); border-radius: var(--raio-p); padding: 12px 14px; margin: 0; white-space: pre-wrap; font-size: 13.5px; }
+.seletor-conta button { font-size: 13.5px; padding: 6px 14px; }
+
 /* ---------- Repescagem ---------- */
 .rp-numero .numero { color: var(--destaque); margin: 0; }
 .rp-lista { max-height: 260px; overflow-y: auto; border: 1px solid var(--borda); border-radius: var(--raio-p); padding: 4px 10px; }

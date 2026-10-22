@@ -738,5 +738,5 @@
   }
 
   ligarEventos();
-  window.Editor = { abrir, fechar, aberto: () => aberto };
+  window.Editor = { abrir, fechar, aberto: () => aberto, limparPosts: () => { postsCache = null; } };
 })();

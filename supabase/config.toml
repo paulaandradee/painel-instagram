@@ -24,3 +24,7 @@ verify_jwt = true
 # Repescagem: chamada pelo painel (pessoa logada)
 [functions.ig-repescagem]
 verify_jwt = true
+
+# Contas e acessos: só administradoras (checado dentro da função)
+[functions.painel-admin]
+verify_jwt = true

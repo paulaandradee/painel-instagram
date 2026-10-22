@@ -1,8 +1,10 @@
 // =====================================================================
 // _shared/ig.ts
-// Peças usadas por várias funções: banco, chamadas ao Instagram,
-// o FREIO, o envio de um passo do fluxo (sendStep) e a entrega da
-// automação (deliverAutomation).
+// Peças usadas por várias funções: banco, contas de Instagram, chamadas
+// à API, o FREIO, o envio de um passo do fluxo (sendStep) e a entrega
+// da automação (deliverAutomation).
+// O painel tem VÁRIAS contas: tudo aqui recebe a conta (ou a automação,
+// que sabe de qual conta é) e usa o token e o freio dela.
 // =====================================================================
 import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
@@ -10,6 +12,7 @@ import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
 export const ENV = {
   SUPABASE_URL: Deno.env.get("SUPABASE_URL") ?? "",
   SERVICE_ROLE: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  // Antigos (uma conta só): usados apenas como reserva da primeira conta
   IG_ACCESS_TOKEN: Deno.env.get("IG_ACCESS_TOKEN") ?? "",
   IG_ACCOUNT_ID: Deno.env.get("IG_ACCOUNT_ID") ?? "",
   APP_SECRET: Deno.env.get("APP_SECRET") ?? "",
@@ -22,9 +25,6 @@ export const ENV = {
 };
 
 export const GRAPH = `https://graph.instagram.com/${ENV.GRAPH_API_VERSION}`;
-
-// Chave do contador do freio (linha em ig_send_budget)
-export const BUDGET_KEY = "private_reply";
 
 // Limites do Instagram
 export const BUTTON_TITLE_MAX = 20;   // título de botão é cortado em 20
@@ -48,6 +48,7 @@ export type FlowStep = {
 };
 export type Automation = {
   id: string;
+  conta_id: string;
   nome: string;
   keyword: string;
   match_any: boolean;
@@ -62,28 +63,57 @@ export type Automation = {
 // Destinatário: por comentário (resposta privada) ou por id (DM normal)
 export type Recipient = { comment_id: string } | { id: string };
 
-// ---------- Token: usa o renovado (banco) ou o segredo ----------
-let cachedToken: string | null = null;
-export async function getToken(): Promise<string> {
-  if (cachedToken) return cachedToken;
-  try {
-    const { data } = await db.from("ig_token_store").select("access_token").eq("id", "main").maybeSingle();
-    if (data?.access_token) {
-      cachedToken = data.access_token;
-      return cachedToken!;
-    }
-  } catch (_) { /* cai no segredo */ }
-  cachedToken = ENV.IG_ACCESS_TOKEN;
-  return cachedToken;
+// ---------- Contas de Instagram ----------
+export type Conta = { id: string; ig_user_id: string; app_scoped_id: string | null; username: string | null; token: string };
+
+const cacheContas = new Map<string, Conta>();
+
+async function montarConta(linha: any): Promise<Conta | null> {
+  if (!linha) return null;
+  const { data: t } = await db.from("ig_contas_token").select("access_token").eq("conta_id", linha.id).maybeSingle();
+  // reserva: a primeira conta ainda pode usar o segredo antigo
+  const token = t?.access_token || (linha.ig_user_id === ENV.IG_ACCOUNT_ID ? ENV.IG_ACCESS_TOKEN : "");
+  if (!token) { console.warn("[conta] sem token:", linha.username); return null; }
+  const c: Conta = { id: linha.id, ig_user_id: linha.ig_user_id, app_scoped_id: linha.app_scoped_id, username: linha.username, token };
+  cacheContas.set(c.id, c);
+  return c;
 }
 
-// ---------- Chamadas à API do Instagram ----------
+export async function contaPorId(id: string): Promise<Conta | null> {
+  if (!id) return null;
+  if (cacheContas.has(id)) return cacheContas.get(id)!;
+  const { data } = await db.from("ig_contas").select("*").eq("id", id).eq("ativo", true).maybeSingle();
+  return montarConta(data);
+}
+
+// O Meta identifica a conta pelo id dela (pode vir em qualquer um dos dois formatos)
+export async function contaPorIgId(igId: string): Promise<Conta | null> {
+  if (!igId) return null;
+  for (const c of cacheContas.values()) if (c.ig_user_id === igId || c.app_scoped_id === igId) return c;
+  const { data } = await db.from("ig_contas").select("*").eq("ativo", true)
+    .or(`ig_user_id.eq.${igId},app_scoped_id.eq.${igId}`).maybeSingle();
+  return montarConta(data);
+}
+
+export async function todasContas(): Promise<Conta[]> {
+  const { data } = await db.from("ig_contas").select("*").eq("ativo", true);
+  const out: Conta[] = [];
+  for (const l of data ?? []) { const c = await montarConta(l); if (c) out.push(c); }
+  return out;
+}
+
+// É a própria conta (comentário ou mensagem dela mesma)?
+export function ehDaConta(conta: Conta, igId?: string) {
+  return !!igId && (igId === conta.ig_user_id || igId === conta.app_scoped_id);
+}
+
+// ---------- Chamadas à API do Instagram (sempre com o token da conta) ----------
 export type GraphResult = { ok: boolean; data?: any; error?: any; status: number };
 
-export async function graphPost(path: string, body: unknown): Promise<GraphResult> {
-  const token = await getToken();
+export async function graphPost(token: string, path: string, body: unknown): Promise<GraphResult> {
   try {
-    const r = await fetch(`${GRAPH}${path}?access_token=${encodeURIComponent(token)}`, {
+    const sep = path.includes("?") ? "&" : "?";
+    const r = await fetch(`${GRAPH}${path}${sep}access_token=${encodeURIComponent(token)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -96,8 +126,7 @@ export async function graphPost(path: string, body: unknown): Promise<GraphResul
   }
 }
 
-export async function graphGet(path: string, params: Record<string, string> = {}): Promise<GraphResult> {
-  const token = await getToken();
+export async function graphGet(token: string, path: string, params: Record<string, string> = {}): Promise<GraphResult> {
   const qs = new URLSearchParams({ ...params, access_token: token });
   try {
     const r = await fetch(`${GRAPH}${path}?${qs}`);
@@ -120,11 +149,13 @@ function errText(err: any): string {
   return `${err.code ?? ""} ${err.error_subcode ?? ""} ${err.message ?? JSON.stringify(err)}`.trim();
 }
 
-// ---------- O FREIO ----------
+// ---------- O FREIO (um contador por conta: o limite da Meta é por conta) ----------
 // Sem as funções take_send_slot/record_send_result no banco, o freio
 // falha FECHADO: nada sai e tudo vai pra fila. Rode o 02_freio.sql!
-export async function takeSlot(): Promise<boolean> {
-  const { data, error } = await db.rpc("take_send_slot", { p_key: BUDGET_KEY });
+export const chaveFreio = (contaId: string) => `private_reply:${contaId}`;
+
+export async function takeSlot(contaId: string): Promise<boolean> {
+  const { data, error } = await db.rpc("take_send_slot", { p_key: chaveFreio(contaId) });
   if (error) {
     console.error("[freio] take_send_slot falhou (rodou o 02_freio.sql?):", error.message);
     return false;
@@ -132,8 +163,8 @@ export async function takeSlot(): Promise<boolean> {
   return data === true;
 }
 
-export async function recordResult(ok: boolean, hard: boolean) {
-  const { error } = await db.rpc("record_send_result", { p_key: BUDGET_KEY, p_ok: ok, p_hard: hard });
+export async function recordResult(contaId: string, ok: boolean, hard: boolean) {
+  const { error } = await db.rpc("record_send_result", { p_key: chaveFreio(contaId), p_ok: ok, p_hard: hard });
   if (error) console.error("[freio] record_send_result falhou:", error.message);
 }
 
@@ -156,36 +187,38 @@ export function keywordMatches(text: string, keywordCsv: string): string | null 
   return null;
 }
 
-// ---------- Logs e leads ----------
+// ---------- Logs e leads (sempre da conta) ----------
 export async function logDelivery(row: {
-  ig_user_id: string; automation_id?: string | null; canal: string; tipo: string; status: string; motivo?: string;
+  conta_id: string; ig_user_id: string; automation_id?: string | null; canal: string; tipo: string; status: string; motivo?: string;
 }) {
   await db.from("ig_deliveries").insert(row);
 }
 
-export async function upsertLead(ig_user_id: string, fields: Record<string, unknown>) {
-  await db.from("ig_leads").upsert({ ig_user_id, ...fields, updated_at: new Date().toISOString() }, {
-    onConflict: "ig_user_id",
-  });
+export async function upsertLead(contaId: string, ig_user_id: string, fields: Record<string, unknown>) {
+  await db.from("ig_leads").upsert(
+    { conta_id: contaId, ig_user_id, ...fields, updated_at: new Date().toISOString() },
+    { onConflict: "conta_id,ig_user_id" },
+  );
 }
 
 // Soma 1 no contador de interações (criar = cria o lead se não existir)
-export async function registrarInteracao(igUserId: string, criar: boolean) {
-  const { error } = await db.rpc("registrar_interacao", { p_user: igUserId, p_criar: criar });
-  if (error) console.warn("[lead] registrar_interacao falhou (rodou o 06_interacoes.sql?):", error.message);
+export async function registrarInteracao(contaId: string, igUserId: string, criar: boolean) {
+  const { error } = await db.rpc("registrar_interacao", { p_conta: contaId, p_user: igUserId, p_criar: criar });
+  if (error) console.warn("[lead] registrar_interacao falhou (rodou o 09_contas_parte1.sql?):", error.message);
 }
 
 // Busca nome e @ do perfil. A API só libera depois que a pessoa
 // mandou mensagem pra conta, então é "melhor esforço".
-export async function completarPerfil(igUserId: string) {
-  const { data: lead } = await db.from("ig_leads").select("nome, username").eq("ig_user_id", igUserId).maybeSingle();
+export async function completarPerfil(conta: Conta, igUserId: string) {
+  const { data: lead } = await db.from("ig_leads").select("nome, username")
+    .eq("conta_id", conta.id).eq("ig_user_id", igUserId).maybeSingle();
   if (!lead || (lead.nome && lead.username)) return;
-  const r = await graphGet(`/${igUserId}`, { fields: "name,username" });
+  const r = await graphGet(conta.token, `/${igUserId}`, { fields: "name,username" });
   if (!r.ok) return;
   const campos: Record<string, unknown> = {};
   if (r.data?.name && !lead.nome) campos.nome = r.data.name;
   if (r.data?.username && !lead.username) campos.username = r.data.username;
-  if (Object.keys(campos).length) await db.from("ig_leads").update(campos).eq("ig_user_id", igUserId);
+  if (Object.keys(campos).length) await db.from("ig_leads").update(campos).eq("conta_id", conta.id).eq("ig_user_id", igUserId);
 }
 
 async function rememberMid(mid?: string) {
@@ -224,6 +257,10 @@ export async function sendStep(
   recipient: Recipient,
   igUserId: string,
 ): Promise<{ ok: boolean; hard: boolean; error?: string; tipo: string }> {
+  const conta = await contaPorId(auto.conta_id);
+  if (!conta) return { ok: false, hard: false, error: "conta sem token ou desativada", tipo: "text" };
+  const post = (body: unknown) => graphPost(conta.token, "/me/messages", body);
+
   // Botões válidos: com url (link) OU com next (avança). Sem destino = descartado.
   const buttons = (step.buttons ?? []).filter((b) => (b.url && b.url.trim()) || (b.next !== undefined && b.next !== null && b.next !== ""));
   const hasLink = buttons.some((b) => b.url);
@@ -239,7 +276,7 @@ export async function sendStep(
         ? { type: "web_url", url: b.url.trim(), title: cut(b.title || "Acessar", BUTTON_TITLE_MAX) }
         : { type: "postback", title: cut(b.title || "Continuar", BUTTON_TITLE_MAX), payload: stepPayload(auto.id, b.next!) }
     );
-    res = await graphPost("/me/messages", {
+    res = await post({
       recipient,
       message: {
         attachment: { type: "template", payload: { template_type: "button", text: cut(text, 640), buttons: tplButtons } },
@@ -257,18 +294,18 @@ export async function sendStep(
       }));
       const qrText = [text, ...links].join("\n\n");
       res = qrs.length
-        ? await graphPost("/me/messages", { recipient, message: { text: qrText, quick_replies: qrs } })
-        : await graphPost("/me/messages", { recipient, message: { text: qrText } });
+        ? await post({ recipient, message: { text: qrText, quick_replies: qrs } })
+        : await post({ recipient, message: { text: qrText } });
     }
 
     // 3) Último recurso: texto puro (com os links no texto)
     if (!res.ok && !isHardError(res.error)) {
       console.warn("[sendStep] quick_reply recusado, mandando texto puro:", errText(res.error));
       const links = buttons.filter((b) => b.url).map((b) => `${b.title || "Acessar"}: ${b.url}`);
-      res = await graphPost("/me/messages", { recipient, message: { text: [text, ...links].join("\n\n") } });
+      res = await post({ recipient, message: { text: [text, ...links].join("\n\n") } });
     }
   } else {
-    res = await graphPost("/me/messages", { recipient, message: { text } });
+    res = await post({ recipient, message: { text } });
   }
 
   if (!res.ok) {
@@ -283,12 +320,9 @@ export async function sendStep(
   // quando já temos o id da pessoa (DM aberta). Ver LEIA-ME.
   const assetIds = step.assets?.length ? step.assets : (step === firstStep(auto) ? auto.asset_ids : []);
   if (assetIds?.length && "id" in recipient) {
-    const { data: assets } = await db.from("ig_assets").select("*").in("id", assetIds);
+    const { data: assets } = await db.from("ig_assets").select("*").eq("conta_id", conta.id).in("id", assetIds);
     for (const a of assets ?? []) {
-      const r = await graphPost("/me/messages", {
-        recipient,
-        message: { attachment: { type: a.tipo, payload: { url: a.public_url } } },
-      });
+      const r = await post({ recipient, message: { attachment: { type: a.tipo, payload: { url: a.public_url } } } });
       if (r.ok) await rememberMid(r.data?.message_id);
       else console.warn("[sendStep] arquivo não enviado:", a.nome, errText(r.error));
     }
@@ -301,12 +335,13 @@ export async function sendStep(
     if (step.collect?.field) {
       lead.expecting = { field: step.collect.field, automation_id: auto.id, next: step.collect.next ?? null };
     }
-    await upsertLead(igUserId, lead);
+    await upsertLead(conta.id, igUserId, lead);
   }
 
   // Passo com atraso: agenda o próximo
   if (step.delay?.seconds && step.delay.next !== undefined && igUserId) {
     await db.from("ig_scheduled").insert({
+      conta_id: conta.id,
       ig_user_id: igUserId,
       automation_id: auto.id,
       step_id: String(step.delay.next),
@@ -318,20 +353,22 @@ export async function sendStep(
 }
 
 // ---------- deliverAutomation: entrega a Mensagem 1 (via comentário) ----------
-// Passa pelo FREIO antes. Sem ficha: vai pra fila e retorna "throttled".
+// Passa pelo FREIO da conta antes. Sem ficha: vai pra fila e retorna "throttled".
 export async function deliverAutomation(
   auto: Automation,
   ctx: { commentId: string; igUserId: string; username?: string },
 ): Promise<"ok" | "throttled" | "erro"> {
+  const base = { conta_id: auto.conta_id, ig_user_id: ctx.igUserId, automation_id: auto.id, canal: "private_reply" };
   const step = firstStep(auto);
   if (!step) {
-    await logDelivery({ ig_user_id: ctx.igUserId, automation_id: auto.id, canal: "private_reply", tipo: "flow", status: "erro", motivo: "automação sem passos no fluxo" });
+    await logDelivery({ ...base, tipo: "flow", status: "erro", motivo: "automação sem passos no fluxo" });
     return "erro";
   }
 
-  const temFicha = await takeSlot();
+  const temFicha = await takeSlot(auto.conta_id);
   if (!temFicha) {
     const { error } = await db.from("ig_send_queue").upsert({
+      conta_id: auto.conta_id,
       comment_id: ctx.commentId,
       automation_id: auto.id,
       ig_user_id: ctx.igUserId,
@@ -339,19 +376,16 @@ export async function deliverAutomation(
       status: "pendente",
     }, { onConflict: "comment_id", ignoreDuplicates: true });
     if (error) {
-      await logDelivery({ ig_user_id: ctx.igUserId, automation_id: auto.id, canal: "private_reply", tipo: "flow", status: "erro", motivo: "falhou ao enfileirar: " + error.message });
+      await logDelivery({ ...base, tipo: "flow", status: "erro", motivo: "falhou ao enfileirar: " + error.message });
       return "erro";
     }
-    await logDelivery({ ig_user_id: ctx.igUserId, automation_id: auto.id, canal: "private_reply", tipo: "flow", status: "na_fila", motivo: "freio sem ficha" });
+    await logDelivery({ ...base, tipo: "flow", status: "na_fila", motivo: "freio sem ficha" });
     return "throttled";
   }
 
   const r = await sendStep(auto, step, { comment_id: ctx.commentId }, ctx.igUserId);
-  await recordResult(r.ok, r.hard);
-  await logDelivery({
-    ig_user_id: ctx.igUserId, automation_id: auto.id, canal: "private_reply", tipo: r.tipo,
-    status: r.ok ? "ok" : "erro", motivo: r.error,
-  });
+  await recordResult(auto.conta_id, r.ok, r.hard);
+  await logDelivery({ ...base, tipo: r.tipo, status: r.ok ? "ok" : "erro", motivo: r.error });
   return r.ok ? "ok" : "erro";
 }
 
@@ -359,8 +393,10 @@ export async function deliverAutomation(
 export async function replyToComment(auto: Automation, commentId: string) {
   const options = [auto.public_reply, ...(auto.public_reply_variants ?? [])].map((s) => (s ?? "").trim()).filter(Boolean);
   if (!options.length) return;
+  const conta = await contaPorId(auto.conta_id);
+  if (!conta) return;
   const message = options[Math.floor(Math.random() * options.length)];
-  const r = await graphPost(`/${commentId}/replies`, { message });
+  const r = await graphPost(conta.token, `/${commentId}/replies`, { message });
   if (!r.ok) console.warn("[comentário] resposta pública falhou:", errText(r.error));
 }
 

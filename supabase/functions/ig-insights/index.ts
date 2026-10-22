@@ -1,6 +1,6 @@
 // =====================================================================
 // ig-insights: a aba "Análises" do painel
-// Corpo (POST): { periodo: 7 | 30 | 90, atualizar?: bool, comentarios?: bool }
+// Corpo (POST): { conta_id, periodo: 7 | 30 | 90, atualizar?: bool, comentarios?: bool }
 // Devolve: perfil, totais do período, séries por dia (alcance e novos
 // seguidores), posts do período com métricas e o ranking de quem mais
 // comenta.
@@ -8,8 +8,8 @@
 // força buscar de novo. O ranking de comentários só roda quando pedido.
 // Só responde pra quem está logado no painel.
 // =====================================================================
-import { db, ENV, graphGet } from "../_shared/ig.ts";
-import { CORS, reply, requireUser } from "../_shared/painel.ts";
+import { Conta, db, graphGet } from "../_shared/ig.ts";
+import { contaDoUsuario, CORS, reply, requireUser } from "../_shared/painel.ts";
 
 const DIA = 86400;
 const VALIDADE_MS = 6 * 3600 * 1000;
@@ -36,20 +36,20 @@ async function emLotes<T, R>(itens: T[], tamanho: number, fn: (x: T) => Promise<
 }
 
 // Pede o período inteiro numa chamada; se o Instagram recusar, divide em blocos de 30 dias
-async function periodoOuBlocos(params: Record<string, string>, dias: number) {
+async function periodoOuBlocos(conta: Conta, params: Record<string, string>, dias: number) {
   const fim = Math.floor(Date.now() / 1000);
-  const inteiro = await graphGet(`/${ENV.IG_ACCOUNT_ID}/insights`, { ...params, since: String(fim - dias * DIA), until: String(fim) });
+  const inteiro = await graphGet(conta.token, `/${conta.ig_user_id}/insights`, { ...params, since: String(fim - dias * DIA), until: String(fim) });
   if (inteiro.ok) return { res: [inteiro], blocos: false };
   const res = await Promise.all(janelas(dias).map(([s, u]) =>
-    graphGet(`/${ENV.IG_ACCOUNT_ID}/insights`, { ...params, since: String(s), until: String(u) })));
+    graphGet(conta.token, `/${conta.ig_user_id}/insights`, { ...params, since: String(s), until: String(u) })));
   return { res, blocos: true };
 }
 
 // Série por dia (alcance ou novos seguidores).
 // O valor com end_time do dia X se refere ao dia anterior: ajusta.
-async function serieDiaria(metric: string, dias: number): Promise<Ponto[]> {
+async function serieDiaria(conta: Conta, metric: string, dias: number): Promise<Ponto[]> {
   const pontos = new Map<string, number>();
-  const { res } = await periodoOuBlocos({ metric, period: "day" }, dias);
+  const { res } = await periodoOuBlocos(conta, { metric, period: "day" }, dias);
   for (const r of res) {
     if (!r.ok) continue;
     for (const v of r.data?.data?.[0]?.values ?? []) {
@@ -63,11 +63,11 @@ async function serieDiaria(metric: string, dias: number): Promise<Ponto[]> {
 // Totais do período (cada métrica separada: se uma falhar, as outras vêm)
 const METRICAS_CONTA = ["reach", "accounts_engaged", "total_interactions", "likes", "comments", "shares", "saves", "views", "profile_views"];
 // aproximado = algum total precisou ser somado em blocos (conta a mesma pessoa mais de uma vez)
-async function totais(dias: number): Promise<{ soma: Record<string, number>; aproximado: boolean }> {
+async function totais(conta: Conta, dias: number): Promise<{ soma: Record<string, number>; aproximado: boolean }> {
   const soma: Record<string, number> = {};
   let aproximado = false;
   await Promise.all(METRICAS_CONTA.map(async (m) => {
-    const { res, blocos } = await periodoOuBlocos({ metric: m, metric_type: "total_value", period: "day" }, dias);
+    const { res, blocos } = await periodoOuBlocos(conta, { metric: m, metric_type: "total_value", period: "day" }, dias);
     for (const r of res) {
       if (!r.ok) continue;
       soma[m] = (soma[m] ?? 0) + Number(r.data?.data?.[0]?.total_value?.value ?? 0);
@@ -78,13 +78,13 @@ async function totais(dias: number): Promise<{ soma: Record<string, number>; apr
 }
 
 // Só os ids dos posts mais recentes (pro ranking "todos os posts")
-async function idsRecentes(max: number) {
+async function idsRecentes(conta: Conta, max: number) {
   const ids: { id: string }[] = [];
   let after: string | undefined;
   while (ids.length < max) {
     const params: Record<string, string> = { fields: "id", limit: "50" };
     if (after) params.after = after;
-    const r = await graphGet(`/${ENV.IG_ACCOUNT_ID}/media`, params);
+    const r = await graphGet(conta.token, `/${conta.ig_user_id}/media`, params);
     if (!r.ok) break;
     ids.push(...(r.data?.data ?? []).map((p: any) => ({ id: p.id })));
     after = r.data?.paging?.cursors?.after;
@@ -94,7 +94,7 @@ async function idsRecentes(max: number) {
 }
 
 // Posts publicados no período, com as métricas de cada um
-async function postsDoPeriodo(dias: number) {
+async function postsDoPeriodo(conta: Conta, dias: number) {
   const desde = Date.now() - dias * DIA * 1000;
   const lista: any[] = [];
   let after: string | undefined;
@@ -104,7 +104,7 @@ async function postsDoPeriodo(dias: number) {
       limit: "50",
     };
     if (after) params.after = after;
-    const r = await graphGet(`/${ENV.IG_ACCOUNT_ID}/media`, params);
+    const r = await graphGet(conta.token, `/${conta.ig_user_id}/media`, params);
     if (!r.ok) break;
     const dados = r.data?.data ?? [];
     lista.push(...dados.filter((p: any) => new Date(p.timestamp).getTime() >= desde));
@@ -115,8 +115,8 @@ async function postsDoPeriodo(dias: number) {
 
   return await emLotes(lista.slice(0, MAX_POSTS), 10, async (p: any) => {
     // métricas do post; se o lote todo falhar, tenta o básico
-    let ins = await graphGet(`/${p.id}/insights`, { metric: "reach,saved,shares,views,total_interactions" });
-    if (!ins.ok) ins = await graphGet(`/${p.id}/insights`, { metric: "reach,saved,shares" });
+    let ins = await graphGet(conta.token, `/${p.id}/insights`, { metric: "reach,saved,shares,views,total_interactions" });
+    if (!ins.ok) ins = await graphGet(conta.token, `/${p.id}/insights`, { metric: "reach,saved,shares" });
     const m: Record<string, number> = {};
     for (const d of ins.ok ? ins.data?.data ?? [] : []) m[d.name] = Number(d.values?.[0]?.value ?? 0);
     const curtidas = Number(p.like_count ?? 0), comentarios = Number(p.comments_count ?? 0);
@@ -139,7 +139,7 @@ async function postsDoPeriodo(dias: number) {
 }
 
 // Ranking de quem mais comenta (lê os comentários dos posts do período)
-async function comentaristas(posts: { id: string }[], meuUsername: string, maxPosts: number) {
+async function comentaristas(conta: Conta, posts: { id: string }[], meuUsername: string, maxPosts: number) {
   const contagem = new Map<string, number>();
   let total = 0;
   const alvo = posts.slice(0, maxPosts);
@@ -149,12 +149,12 @@ async function comentaristas(posts: { id: string }[], meuUsername: string, maxPo
       // "username" no comentário vem vazio nesta API: quem comentou vem em "from"
       const params: Record<string, string> = { fields: "from", limit: "50" };
       if (after) params.after = after;
-      const r = await graphGet(`/${p.id}/comments`, params);
+      const r = await graphGet(conta.token, `/${p.id}/comments`, params);
       if (!r.ok) break;
       for (const c of r.data?.data ?? []) {
         const u = c.from?.username;
         // ignora as respostas da própria conta
-        if (!u || u === meuUsername || c.from?.id === ENV.IG_ACCOUNT_ID) continue;
+        if (!u || u === meuUsername || c.from?.id === conta.ig_user_id) continue;
         contagem.set(u, (contagem.get(u) ?? 0) + 1);
         total++;
       }
@@ -174,16 +174,19 @@ async function guardar(chave: string, dados: unknown) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
-  if (!(await requireUser(req))) return reply({ ok: false, erro: "não autorizado" }, 401);
-  if (!ENV.IG_ACCOUNT_ID) return reply({ ok: false, conectado: false, erro: "IG_ACCOUNT_ID não configurado" });
+  const userId = await requireUser(req);
+  if (!userId) return reply({ ok: false, erro: "não autorizado" }, 401);
 
   let corpo: any = {};
   try { corpo = await req.json(); } catch { /* sem corpo = padrões */ }
+  // Só a conta que a pessoa pode ver
+  const conta = await contaDoUsuario(userId, String(corpo.conta_id ?? ""));
+  if (!conta) return reply({ ok: false, conectado: false, erro: "Sem acesso a esta conta, ou conta sem token." });
   const periodo = [7, 30, 90, 365].includes(Number(corpo.periodo)) ? Number(corpo.periodo) : 30;
-  const chave = `analise:${periodo}`;
+  const chave = `${conta.id}:analise:${periodo}`;
   // ranking: dos posts do período, ou dos últimos 150 posts ("todos")
   const todos = corpo.escopo === "todos";
-  const chaveCom = todos ? "comentarios:todos" : `comentarios:${periodo}`;
+  const chaveCom = todos ? `${conta.id}:comentarios:todos` : `${conta.id}:comentarios:${periodo}`;
 
   const { data: cache } = await db.from("ig_analises_cache").select("*").in("chave", [chave, chaveCom]);
   const emCache = cache?.find((c) => c.chave === chave);
@@ -197,14 +200,14 @@ Deno.serve(async (req) => {
     dados = emCache.dados;
     atualizado_em = emCache.atualizado_em;
   } else {
-    const perfil = await graphGet(`/${ENV.IG_ACCOUNT_ID}`, { fields: "username,followers_count,media_count,profile_picture_url" });
+    const perfil = await graphGet(conta.token, `/${conta.ig_user_id}`, { fields: "username,followers_count,media_count,profile_picture_url" });
     if (!perfil.ok) return reply({ ok: false, conectado: false, erro: perfil.error?.message ?? "falha ao ler o perfil" });
 
     const [alcance, novos, { soma: tot, aproximado }, posts] = await Promise.all([
-      serieDiaria("reach", periodo),
-      serieDiaria("follower_count", periodo),
-      totais(periodo),
-      postsDoPeriodo(periodo),
+      serieDiaria(conta, "reach", periodo),
+      serieDiaria(conta, "follower_count", periodo),
+      totais(conta, periodo),
+      postsDoPeriodo(conta, periodo),
     ]);
 
     dados = {
@@ -236,8 +239,8 @@ Deno.serve(async (req) => {
   // Ranking de comentários: só calcula quando pedido (demora mais)
   let ranking = comCache ? { ...comCache.dados, escopo: todos ? "todos" : "periodo", atualizado_em: comCache.atualizado_em } : null;
   if (corpo.comentarios) {
-    const alvo = todos ? await idsRecentes(MAX_POSTS_TODOS) : dados.posts ?? [];
-    const r = await comentaristas(alvo, dados.perfil?.username ?? "", todos ? MAX_POSTS_TODOS : MAX_POSTS_COMENTARIOS);
+    const alvo = todos ? await idsRecentes(conta, MAX_POSTS_TODOS) : dados.posts ?? [];
+    const r = await comentaristas(conta, alvo, dados.perfil?.username ?? "", todos ? MAX_POSTS_TODOS : MAX_POSTS_COMENTARIOS);
     ranking = { ...r, escopo: todos ? "todos" : "periodo", atualizado_em: await guardar(chaveCom, r) };
   }
 

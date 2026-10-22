@@ -3,11 +3,13 @@
 // - GET: aperto de mão com o Meta (hub.challenge)
 // - POST: recebe comentários, mensagens, toques em botão (postback e
 //   quick_reply) e responde sozinho.
+// Várias contas: cada evento diz qual conta recebeu (entry.id). O webhook
+// usa só as automações, os leads e o token DESSA conta.
 // Precisa ser PÚBLICA: publique com --no-verify-jwt.
 // =====================================================================
 import {
-  Automation, completarPerfil, db, deliverAutomation, ENV, findStep, json, keywordMatches, logDelivery,
-  parsePayload, registrarInteracao, replyToComment, sendStep, upsertLead,
+  Automation, completarPerfil, Conta, contaPorIgId, db, deliverAutomation, ehDaConta, ENV, findStep, json,
+  keywordMatches, logDelivery, parsePayload, registrarInteracao, replyToComment, sendStep, upsertLead,
 } from "../_shared/ig.ts";
 
 // ---------- Assinatura do Meta (HMAC SHA-256 com o APP_SECRET) ----------
@@ -33,10 +35,10 @@ async function firstTime(eventId: string): Promise<boolean> {
   return !error; // erro de chave duplicada = já processado
 }
 
-// Acha a automação certa. Prioridade: post específico > todos os posts;
-// palavra-chave > "qualquer palavra".
-async function findAutomation(text: string, mediaId?: string): Promise<{ auto: Automation; keyword: string } | null> {
-  const { data } = await db.from("ig_automations").select("*").eq("active", true);
+// Acha a automação certa DA CONTA. Prioridade: post específico > todos os
+// posts; palavra-chave > "qualquer palavra".
+async function findAutomation(conta: Conta, text: string, mediaId?: string): Promise<{ auto: Automation; keyword: string } | null> {
+  const { data } = await db.from("ig_automations").select("*").eq("conta_id", conta.id).eq("active", true);
   let best: { auto: Automation; keyword: string; score: number } | null = null;
   for (const auto of (data ?? []) as Automation[]) {
     const medias = auto.media_ids ?? [];
@@ -49,19 +51,19 @@ async function findAutomation(text: string, mediaId?: string): Promise<{ auto: A
   return best ? { auto: best.auto, keyword: best.keyword } : null;
 }
 
-// Regra do "1 por dia": já recebeu uma DM ok nas últimas 24h?
-async function receivedToday(igUserId: string): Promise<boolean> {
+// Regra do "1 por dia" (por conta): já recebeu uma DM ok nas últimas 24h?
+async function receivedToday(conta: Conta, igUserId: string): Promise<boolean> {
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const { count } = await db.from("ig_deliveries")
     .select("id", { count: "exact", head: true })
-    .eq("ig_user_id", igUserId).eq("canal", "private_reply").eq("status", "ok").gte("ts", since);
+    .eq("conta_id", conta.id).eq("ig_user_id", igUserId).eq("canal", "private_reply").eq("status", "ok").gte("ts", since);
   return (count ?? 0) > 0;
 }
 
 // =====================================================================
 // COMENTÁRIO
 // =====================================================================
-async function handleComment(value: any) {
+async function handleComment(conta: Conta, value: any) {
   const commentId: string = value?.id;
   const fromId: string = value?.from?.id;
   const username: string = value?.from?.username;
@@ -73,21 +75,21 @@ async function handleComment(value: any) {
   if (!(await firstTime(`comment:${commentId}`))) return;
 
   // 2) comentário da própria conta? ignora
-  if (fromId === ENV.IG_ACCOUNT_ID) return;
+  if (ehDaConta(conta, fromId)) return;
 
-  // 3) acha a automação
-  const found = await findAutomation(text, mediaId);
+  // 3) acha a automação da conta
+  const found = await findAutomation(conta, text, mediaId);
   if (!found) return;
   const { auto, keyword } = found;
 
   // Conta a interação (cria o lead, mesmo que a regra do 1 por dia pule o envio)
-  await registrarInteracao(fromId, true);
-  if (username) await upsertLead(fromId, { username });
+  await registrarInteracao(conta.id, fromId, true);
+  if (username) await upsertLead(conta.id, fromId, { username });
 
   // 4) regra do 1 por dia (contas de teste ignoram)
   const isTest = ENV.TEST_IG_ACCOUNTS.includes(fromId);
-  if (!isTest && (await receivedToday(fromId))) {
-    await logDelivery({ ig_user_id: fromId, automation_id: auto.id, canal: "private_reply", tipo: "flow", status: "erro", motivo: "pulado: já recebeu DM nas últimas 24h" });
+  if (!isTest && (await receivedToday(conta, fromId))) {
+    await logDelivery({ conta_id: conta.id, ig_user_id: fromId, automation_id: auto.id, canal: "private_reply", tipo: "flow", status: "erro", motivo: "pulado: já recebeu DM nas últimas 24h" });
     return;
   }
 
@@ -97,7 +99,7 @@ async function handleComment(value: any) {
   // Só marca o lead e responde no comentário se saiu ou está garantido na fila
   if (result === "ok" || result === "throttled") {
     await replyToComment(auto, commentId);
-    await upsertLead(fromId, {
+    await upsertLead(conta.id, fromId, {
       username, last_source: "comment", last_keyword: keyword, automation_id: auto.id,
     });
   } else {
@@ -111,14 +113,14 @@ async function handleComment(value: any) {
 // =====================================================================
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-async function handleMessage(ev: any) {
+async function handleMessage(conta: Conta, ev: any) {
   const senderId: string = ev?.sender?.id;
   const msg = ev?.message;
   const postback = ev?.postback;
 
   // Echo = mensagem que a própria conta mandou (bot ou você na mão). Ignora.
   if (msg?.is_echo) return;
-  if (!senderId || senderId === ENV.IG_ACCOUNT_ID) return;
+  if (!senderId || ehDaConta(conta, senderId)) return;
 
   const mid: string | undefined = msg?.mid ?? postback?.mid;
   if (mid) {
@@ -130,21 +132,27 @@ async function handleMessage(ev: any) {
 
   const source = msg?.reply_to?.story ? "story_reply" : "dm";
 
-  // Conta a interação (só de quem já é lead) e tenta completar nome e @
-  await registrarInteracao(senderId, false);
-  await completarPerfil(senderId);
+  // Conta a interação (só de quem já é lead da conta) e tenta completar nome e @
+  await registrarInteracao(conta.id, senderId, false);
+  await completarPerfil(conta, senderId);
+
+  // Automação pelo id, só se for desta conta
+  const autoDaConta = async (id: string) => {
+    const { data } = await db.from("ig_automations").select("*").eq("id", id).eq("conta_id", conta.id).maybeSingle();
+    return data as Automation | null;
+  };
 
   // ---- Toque em botão: postback OU quick_reply (trate os DOIS) ----
   const payload: string | undefined = postback?.payload ?? msg?.quick_reply?.payload;
   const parsed = parsePayload(payload);
   if (parsed) {
-    const { data: auto } = await db.from("ig_automations").select("*").eq("id", parsed.autoId).maybeSingle();
+    const auto = await autoDaConta(parsed.autoId);
     if (!auto) return;
-    const step = findStep(auto as Automation, parsed.stepId);
+    const step = findStep(auto, parsed.stepId);
     if (!step) return;
-    await upsertLead(senderId, { last_source: source, expecting: null });
-    const r = await sendStep(auto as Automation, step, { id: senderId }, senderId);
-    await logDelivery({ ig_user_id: senderId, automation_id: auto.id, canal: "dm", tipo: r.tipo, status: r.ok ? "ok" : "erro", motivo: r.error });
+    await upsertLead(conta.id, senderId, { last_source: source, expecting: null });
+    const r = await sendStep(auto, step, { id: senderId }, senderId);
+    await logDelivery({ conta_id: conta.id, ig_user_id: senderId, automation_id: auto.id, canal: "dm", tipo: r.tipo, status: r.ok ? "ok" : "erro", motivo: r.error });
     return;
   }
 
@@ -152,10 +160,10 @@ async function handleMessage(ev: any) {
   const text: string = (msg?.text ?? "").trim();
   if (!text) return;
 
-  const { data: lead } = await db.from("ig_leads").select("*").eq("ig_user_id", senderId).maybeSingle();
+  const { data: lead } = await db.from("ig_leads").select("*").eq("conta_id", conta.id).eq("ig_user_id", senderId).maybeSingle();
   const exp = lead?.expecting as { field: string; automation_id: string; next: string | number | null } | null;
   if (exp?.field) {
-    const { data: auto } = await db.from("ig_automations").select("*").eq("id", exp.automation_id).maybeSingle();
+    const auto = await autoDaConta(exp.automation_id);
     let value = text;
     let valid = true;
     if (exp.field === "email") { value = text.toLowerCase(); valid = EMAIL_RE.test(value); }
@@ -165,20 +173,20 @@ async function handleMessage(ev: any) {
       const pedido = exp.field === "email"
         ? "Hmm, esse e-mail parece estranho. Pode mandar de novo? (ex: nome@exemplo.com)"
         : "Hmm, esse número parece estranho. Pode mandar de novo com DDD?";
-      if (auto) await sendStep(auto as Automation, { id: "retry", message: pedido }, { id: senderId }, "");
+      if (auto) await sendStep(auto, { id: "retry", message: pedido }, { id: senderId }, "");
       return;
     }
 
     const fields: Record<string, unknown> = { expecting: null, last_source: source };
     if (exp.field === "email" || exp.field === "telefone") fields[exp.field] = value;
     else fields.extra = { ...(lead?.extra ?? {}), [exp.field]: value };
-    await upsertLead(senderId, fields);
+    await upsertLead(conta.id, senderId, fields);
 
     if (auto && exp.next !== null && exp.next !== undefined) {
-      const next = findStep(auto as Automation, exp.next);
+      const next = findStep(auto, exp.next);
       if (next) {
-        const r = await sendStep(auto as Automation, next, { id: senderId }, senderId);
-        await logDelivery({ ig_user_id: senderId, automation_id: auto.id, canal: "dm", tipo: r.tipo, status: r.ok ? "ok" : "erro", motivo: r.error });
+        const r = await sendStep(auto, next, { id: senderId }, senderId);
+        await logDelivery({ conta_id: conta.id, ig_user_id: senderId, automation_id: auto.id, canal: "dm", tipo: r.tipo, status: r.ok ? "ok" : "erro", motivo: r.error });
       }
     }
     return;
@@ -222,13 +230,18 @@ Deno.serve(async (req) => {
 
   // Processa cada evento sem deixar um erro derrubar os outros
   for (const entry of body?.entry ?? []) {
+    // De qual conta é este evento?
+    const conta = await contaPorIgId(String(entry?.id ?? ""))
+      ?? await contaPorIgId(String(entry?.messaging?.[0]?.recipient?.id ?? ""));
+    if (!conta) { console.warn("[webhook] conta não cadastrada no painel:", entry?.id); continue; }
+
     for (const change of entry?.changes ?? []) {
       if (change?.field === "comments") {
-        try { await handleComment(change.value); } catch (e) { console.error("[comentário] erro:", e); }
+        try { await handleComment(conta, change.value); } catch (e) { console.error("[comentário] erro:", e); }
       }
     }
     for (const ev of entry?.messaging ?? []) {
-      try { await handleMessage(ev); } catch (e) { console.error("[mensagem] erro:", e); }
+      try { await handleMessage(conta, ev); } catch (e) { console.error("[mensagem] erro:", e); }
     }
   }
 
