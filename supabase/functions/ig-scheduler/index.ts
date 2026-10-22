@@ -6,7 +6,7 @@
 // =====================================================================
 import {
   Automation, checkSchedKey, db, findStep, firstStep, json, logDelivery, recordResult,
-  sendStep, takeSlot, upsertLead,
+  replyToComment, sendStep, takeSlot, upsertLead,
 } from "../_shared/ig.ts";
 
 const MAX_TENTATIVAS = 5;
@@ -18,8 +18,9 @@ async function drainQueue() {
     .select("*").eq("status", "pendente").order("created_at", { ascending: true }).limit(20);
 
   for (const item of itens ?? []) {
-    // Comentário velho demais: o Instagram não aceita mais resposta privada
-    if (Date.now() - new Date(item.created_at).getTime() > SETE_DIAS_MS) {
+    // Comentário velho demais: o Instagram não aceita mais resposta privada.
+    // Conta a partir do comentário (repescagem) ou de quando entrou na fila.
+    if (Date.now() - new Date(item.comment_ts ?? item.created_at).getTime() > SETE_DIAS_MS) {
       await db.from("ig_send_queue").update({ status: "expirado" }).eq("id", item.id);
       resumo.expirados++;
       continue;
@@ -46,6 +47,8 @@ async function drainQueue() {
     if (r.ok) {
       await db.from("ig_send_queue").update({ status: "enviado", sent_at: new Date().toISOString() }).eq("id", item.id);
       await upsertLead(item.ig_user_id, { username: item.username, last_source: "comment" });
+      // Repescagem: responde também no comentário, se foi pedido
+      if (item.responder_publico) await replyToComment(auto as Automation, item.comment_id);
       resumo.enviados++;
     } else {
       const tentativas = (item.tentativas ?? 0) + 1;

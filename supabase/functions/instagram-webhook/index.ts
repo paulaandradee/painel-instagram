@@ -6,8 +6,8 @@
 // Precisa ser PÚBLICA: publique com --no-verify-jwt.
 // =====================================================================
 import {
-  Automation, completarPerfil, db, deliverAutomation, ENV, findStep, json, logDelivery, parsePayload,
-  registrarInteracao, replyToComment, sendStep, upsertLead,
+  Automation, completarPerfil, db, deliverAutomation, ENV, findStep, json, keywordMatches, logDelivery,
+  parsePayload, registrarInteracao, replyToComment, sendStep, upsertLead,
 } from "../_shared/ig.ts";
 
 // ---------- Assinatura do Meta (HMAC SHA-256 com o APP_SECRET) ----------
@@ -31,24 +31,6 @@ async function signatureOk(req: Request, raw: string): Promise<boolean> {
 async function firstTime(eventId: string): Promise<boolean> {
   const { error } = await db.from("ig_processed_events").insert({ event_id: eventId });
   return !error; // erro de chave duplicada = já processado
-}
-
-// ---------- Normaliza texto pra casar palavra-chave ----------
-function norm(s: string): string {
-  return (s ?? "")
-    .toLowerCase()
-    .normalize("NFD").replace(/[̀-ͯ]/g, "") // tira acentos
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function keywordMatches(text: string, keywordCsv: string): string | null {
-  const t = ` ${norm(text)} `;
-  for (const kw of (keywordCsv ?? "").split(",")) {
-    const k = norm(kw);
-    if (k && t.includes(` ${k} `)) return kw.trim();
-  }
-  return null;
 }
 
 // Acha a automação certa. Prioridade: post específico > todos os posts;

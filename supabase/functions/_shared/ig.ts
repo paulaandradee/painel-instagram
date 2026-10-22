@@ -137,6 +137,25 @@ export async function recordResult(ok: boolean, hard: boolean) {
   if (error) console.error("[freio] record_send_result falhou:", error.message);
 }
 
+// ---------- Palavra-chave (mesma regra no webhook e na repescagem) ----------
+function norm(s: string): string {
+  return (s ?? "")
+    .toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "") // tira acentos
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+// Devolve a palavra que casou (ou null). Palavras separadas por vírgula.
+export function keywordMatches(text: string, keywordCsv: string): string | null {
+  const t = ` ${norm(text)} `;
+  for (const kw of (keywordCsv ?? "").split(",")) {
+    const k = norm(kw);
+    if (k && t.includes(` ${k} `)) return kw.trim();
+  }
+  return null;
+}
+
 // ---------- Logs e leads ----------
 export async function logDelivery(row: {
   ig_user_id: string; automation_id?: string | null; canal: string; tipo: string; status: string; motivo?: string;
