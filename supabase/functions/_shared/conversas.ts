@@ -85,6 +85,24 @@ export function anonimizar(texto: string, conversa: Pick<Conversa, "nome" | "use
     .replace(/(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}/g, "[telefone]");
 }
 
+// A IA escreve [nome]; aqui, já fora do Google, entra o primeiro nome.
+// Sem nome conhecido, o marcador sai ("Oiii, [nome]!" vira "Oiii!").
+const MARCADOR_NOME = /\[(?:primeiro\s+)?nome\]/gi;
+
+export function colocarNome(texto: string, nome: string | null): string {
+  const primeiro = (nome ?? "").trim().split(/\s+/)[0] ?? "";
+  if (primeiro) {
+    const bonito = primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase();
+    return texto.replace(MARCADOR_NOME, bonito);
+  }
+  return texto
+    .replace(/,?[ \t]*\[(?:primeiro\s+)?nome\][ \t]*(?=[!?.,])/gi, "")
+    .replace(MARCADOR_NOME, "")
+    .replace(/^[ \t]*,[ \t]*/gm, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 // ---------- Gemini ----------
 async function chamarGemini(sistema: string, pedido: string): Promise<string | null> {
   if (!GEMINI_API_KEY) { console.warn("[sugestão] falta o secret GEMINI_API_KEY"); return null; }
@@ -134,10 +152,10 @@ export async function gerarSugestao(conversa: Conversa, mensagemId: string) {
     "Você ajuda o time a responder mensagens do direct do Instagram.",
     "Escreva UMA sugestão de resposta para a Atendente mandar agora à Cliente.",
     "Regras:",
-    "- Português do Brasil, curta (até 3 frases), natural, como uma pessoa digitando no direct.",
+    "- Português do Brasil, curta (de preferência até 3 frases; mais só quando o roteiro pedir uma explicação), natural, como uma pessoa digitando no direct.",
     "- Siga o tom e as orientações do roteiro de atendimento abaixo.",
     "- Não invente preços, prazos, links ou informações que não estejam no roteiro ou na conversa. Se faltar informação, faça uma pergunta ou diga que vai verificar.",
-    "- Chame a pessoa sem nome (o nome foi removido de propósito). Nunca escreva \"Cliente\" na resposta.",
+    "- O nome da pessoa foi removido de propósito. Para chamá-la pelo nome, escreva exatamente [nome] (ele é preenchido depois). Nunca escreva \"Cliente\" na resposta.",
     "- Devolva só o texto da mensagem, sem aspas, sem explicações, sem opções alternativas.",
     "",
     "ROTEIRO DE ATENDIMENTO DO TIME:",
@@ -146,8 +164,9 @@ export async function gerarSugestao(conversa: Conversa, mensagemId: string) {
 
   const pedido = `Conversa até agora (da mais antiga para a mais recente):\n\n${historico}\n\nEscreva a próxima mensagem da Atendente.`;
 
-  const sugestao = await chamarGemini(sistema, pedido);
-  if (!sugestao) return;
+  const bruta = await chamarGemini(sistema, pedido);
+  if (!bruta) return;
+  const sugestao = colocarNome(bruta, conversa.nome);
   const { error } = await db.from("sugestoes").insert({
     conversa_id: conversa.id, conta_id: conversa.conta_id, texto_sugerido: sugestao,
   });
