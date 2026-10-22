@@ -113,7 +113,8 @@ async function chamarGemini(sistema: string, pedido: string): Promise<string | n
       body: JSON.stringify({
         system_instruction: { parts: [{ text: sistema }] },
         contents: [{ role: "user", parts: [{ text: pedido }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+        // Folga grande: os modelos Flash "pensam" antes e isso conta neste limite
+        generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
       }),
     });
     const data = await r.json().catch(() => ({}));
@@ -121,7 +122,9 @@ async function chamarGemini(sistema: string, pedido: string): Promise<string | n
     const texto = (data?.candidates?.[0]?.content?.parts ?? [])
       .filter((p: any) => !p.thought).map((p: any) => p.text ?? "").join("").trim();
     // tira aspas e rótulos que o modelo às vezes coloca em volta
-    return texto.replace(/^(resposta|sugest[aã]o|voc[eê])\s*:\s*/i, "").replace(/^["“]|["”]$/g, "").trim() || null;
+    const limpo = texto.replace(/^(resposta|sugest[aã]o|voc[eê])\s*:\s*/i, "").replace(/^["“]|["”]$/g, "").trim();
+    if (!limpo) console.warn("[sugestão] Gemini respondeu vazio:", JSON.stringify(data?.candidates?.[0]?.finishReason ?? data?.promptFeedback ?? data).slice(0, 300));
+    return limpo || null;
   } catch (e) {
     console.error("[sugestão] erro ao chamar o Gemini:", e);
     return null;
@@ -132,10 +135,11 @@ async function chamarGemini(sistema: string, pedido: string): Promise<string | n
 // a mensagem da cliente chega. mensagemId = a mensagem que disparou.
 export async function gerarSugestao(conversa: Conversa, mensagemId: string) {
   // Espera um pouco: se ela mandar outra mensagem nesse meio-tempo, só a última gera sugestão
+  console.log("[sugestão] começando, conversa", conversa.id);
   await new Promise((r) => setTimeout(r, ESPERA_AGRUPAR_MS));
   const { data: ultima } = await db.from("mensagens").select("id")
     .eq("conversa_id", conversa.id).order("criada_em", { ascending: false }).limit(1).maybeSingle();
-  if (ultima?.id !== mensagemId) return;
+  if (ultima?.id !== mensagemId) { console.log("[sugestão] pulada: chegou mensagem mais nova na conversa"); return; }
 
   const [{ data: msgs }, { data: roteiro }] = await Promise.all([
     db.from("mensagens").select("autor, texto").eq("conversa_id", conversa.id)
@@ -171,4 +175,5 @@ export async function gerarSugestao(conversa: Conversa, mensagemId: string) {
     conversa_id: conversa.id, conta_id: conversa.conta_id, texto_sugerido: sugestao,
   });
   if (error) console.error("[sugestão] não gravou:", error.message);
+  else console.log("[sugestão] salva (modelo", GEMINI_MODEL + ")");
 }
