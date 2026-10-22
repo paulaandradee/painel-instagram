@@ -12,7 +12,7 @@
 // =====================================================================
 import { contaDoUsuario, CORS, reply, requireUser } from "../_shared/painel.ts";
 import { Conta, db, ehDaConta, graphGet } from "../_shared/ig.ts";
-import { Conversa, conversaDe, gerarSugestao, Midia } from "../_shared/conversas.ts";
+import { Conversa, conversaDe, gerarSugestao, Midia, ultimaFalha } from "../_shared/conversas.ts";
 
 const DIA_MS = 24 * 3600 * 1000;
 const JANELA_MS = 7 * DIA_MS;
@@ -122,7 +122,12 @@ Deno.serve(async (req) => {
     if (!conversa) return reply({ ok: false, erro: "Conversa não encontrada." }, 404);
     if (!(await contaDoUsuario(userId, conversa.conta_id))) return reply({ ok: false, erro: "Você não tem acesso a esta conta." }, 403);
     const texto = await gerarSugestao(conversa as Conversa, null);
-    if (!texto) return reply({ ok: false, erro: "A IA não conseguiu sugerir agora. Tente de novo em instantes." }, 502);
+    if (!texto) {
+      const erro = ultimaFalha() === "limite"
+        ? "O limite gratuito da IA foi atingido agora. Tente de novo mais tarde, ou escreva a resposta à mão."
+        : "A IA não conseguiu sugerir agora. Tente de novo em instantes.";
+      return reply({ ok: false, codigo: ultimaFalha() ?? "erro", erro }, 502);
+    }
     return reply({ ok: true, texto });
   }
 

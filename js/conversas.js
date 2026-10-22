@@ -39,6 +39,7 @@
   let relogio = null;     // a vigia: confere novidades e atualiza o aviso da janela
   const pedidas = new Set(); // conversas que já pediram sugestão nesta sessão
   let gerandoPara = null;    // conversa com sugestão sendo gerada agora
+  let falha = null;          // { id, msg }: a última tentativa de sugestão falhou
 
   const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const nomeDe = (c) => c.nome || (c.username ? `@${c.username}` : "Sem nome");
@@ -303,7 +304,11 @@
       caixa.value = sugestao.texto_sugerido;
       editado = false;
     }
-    if (!sugestao) aviso.innerHTML = gerandoPara && gerandoPara === atual?.id ? `<div class="cx-sug">✨ Gerando sugestão...</div>` : "";
+    if (!sugestao) {
+      aviso.innerHTML = gerandoPara && gerandoPara === atual?.id ? `<div class="cx-sug">✨ Gerando sugestão...</div>`
+        : falha && falha.id === atual?.id ? `<div class="cx-sug cx-sug-falha">${esc(falha.msg)} <button class="link-btn" data-acao="nova-sugestao">Tentar de novo</button></div>`
+        : "";
+    }
     else if (!editado && caixa.value === sugestao.texto_sugerido) {
       aviso.innerHTML = `<div class="cx-sug">✨ Sugestão da IA. Revise antes de enviar.</div>`;
     } else {
@@ -460,6 +465,8 @@
     const r = await invocar("conversas-acoes", { acao: "sugerir", conversa_id: conversaId });
     if (gerandoPara === conversaId) gerandoPara = null;
     if ($("#cx-nova-sug")) $("#cx-nova-sug").disabled = false;
+    if (!r?.ok) falha = { id: conversaId, msg: r?.codigo === "limite" ? "⏳ Limite gratuito da IA atingido agora. Escreva à mão ou tente mais tarde." : "A IA não conseguiu sugerir agora." };
+    else if (falha?.id === conversaId) falha = null;
     if (atual?.id !== conversaId) return;
     if (!r?.ok) {
       preencherSugestao();

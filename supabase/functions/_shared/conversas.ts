@@ -8,8 +8,9 @@
 import { Conta, db, graphGet } from "./ig.ts";
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
-// O nome do modelo muda com frequência: troque pelo secret GEMINI_MODEL se precisar.
-const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-flash-latest";
+// Opcional: força um modelo na frente da fila (secret GEMINI_MODEL). Sem ele,
+// a fila é montada sozinha: Flash > Flash-Lite > Gemma (ver "Gemini" abaixo).
+const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "";
 
 const HISTORICO = 20;          // últimas N mensagens mandadas pra IA
 const ESPERA_AGRUPAR_MS = 4000; // cliente manda 3 mensagens seguidas = 1 sugestão só
@@ -129,31 +130,101 @@ export function colocarNome(texto: string, nome: string | null): string {
 }
 
 // ---------- Gemini ----------
-async function chamarGemini(sistema: string, pedido: string): Promise<string | null> {
-  if (!GEMINI_API_KEY) { console.warn("[sugestão] falta o secret GEMINI_API_KEY"); return null; }
+// O plano gratuito tem cota pequena por modelo (o Flash dá só umas dezenas
+// por dia). Por isso há uma fila de modelos: o melhor primeiro e, quando um
+// estoura a cota, o próximo. Os nomes vêm da lista do próprio Google (eles
+// mudam com frequência); GEMINI_MODEL, se existir, vai na frente.
+const API = "https://generativelanguage.googleapis.com/v1beta";
+const PAUSA_COTA_MS = 15 * 60 * 1000;          // modelo que estourou fica de lado por 15 min
+const descansando = new Map<string, number>(); // modelo -> até quando
+let cadeia: string[] | null = null;
+let motivoFalha: "limite" | "erro" | null = null;
+
+// Por que a última sugestão falhou (o painel mostra um aviso melhor)
+export const ultimaFalha = () => motivoFalha;
+
+const versao = (n: string) => (n.match(/\d+(\.\d+)?/)?.[0] ?? "0").split(".").map(Number);
+const maisNovo = (a: string, b: string) => {
+  const [x, y] = [versao(a), versao(b)];
+  return (y[0] - x[0]) || ((y[1] ?? 0) - (x[1] ?? 0));
+};
+
+async function modelos(): Promise<string[]> {
+  if (cadeia) return cadeia;
+  let nomes: string[] = [];
   try {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: sistema }] },
-        contents: [{ role: "user", parts: [{ text: pedido }] }],
-        // Folga grande: os modelos Flash "pensam" antes e isso conta neste limite
-        generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
-      }),
-    });
+    const r = await fetch(`${API}/models?pageSize=200`, { headers: { "x-goog-api-key": GEMINI_API_KEY } });
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) { console.error("[sugestão] Gemini recusou:", r.status, JSON.stringify(data?.error ?? data)); return null; }
-    const texto = (data?.candidates?.[0]?.content?.parts ?? [])
-      .filter((p: any) => !p.thought).map((p: any) => p.text ?? "").join("").trim();
-    // tira aspas e rótulos que o modelo às vezes coloca em volta
-    const limpo = texto.replace(/^(resposta|sugest[aã]o|voc[eê])\s*:\s*/i, "").replace(/^["“]|["”]$/g, "").trim();
-    if (!limpo) console.warn("[sugestão] Gemini respondeu vazio:", JSON.stringify(data?.candidates?.[0]?.finishReason ?? data?.promptFeedback ?? data).slice(0, 300));
-    return limpo || null;
-  } catch (e) {
-    console.error("[sugestão] erro ao chamar o Gemini:", e);
-    return null;
+    nomes = (data?.models ?? [])
+      .filter((m: any) => (m.supportedGenerationMethods ?? []).includes("generateContent"))
+      .map((m: any) => String(m.name).replace(/^models\//, ""));
+  } catch (e) { console.warn("[sugestão] não listou os modelos:", e); }
+  const tem = (n: string) => nomes.includes(n);
+  const flash = tem("gemini-flash-latest") ? "gemini-flash-latest"
+    : nomes.filter((n) => /^gemini-[\d.]+-flash$/.test(n)).sort(maisNovo)[0];
+  const lite = tem("gemini-flash-lite-latest") ? "gemini-flash-lite-latest"
+    : nomes.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n)).sort(maisNovo)[0];
+  // Gemma: o maior da versão mais nova (ex.: gemma-3-27b-it)
+  const tamanho = (n: string) => Number(n.match(/-(\d+)b-/)?.[1] ?? 0);
+  const gemma = nomes.filter((n) => /^gemma-\d.*-it$/.test(n))
+    .sort((a, b) => maisNovo(a, b) || tamanho(b) - tamanho(a))[0];
+  // sem a lista (falhou), usa os apelidos que o Google mantém
+  cadeia = [...new Set([
+    GEMINI_MODEL, flash || "gemini-flash-latest", lite || (nomes.length ? "" : "gemini-flash-lite-latest"), gemma,
+  ].filter(Boolean) as string[])];
+  console.log("[sugestão] modelos na fila:", cadeia.join(" > "));
+  return cadeia;
+}
+
+// Um pedido a UM modelo. Devolve o texto, "pular" (cota, fora do ar, modelo
+// inexistente: tenta o próximo) ou null (resposta vazia).
+async function pedirAoModelo(modelo: string, sistema: string, pedido: string): Promise<string | "pular" | null> {
+  // Gemma não aceita instrução de sistema: vai junto do pedido
+  const ehGemma = modelo.startsWith("gemma");
+  const corpo = ehGemma
+    ? { contents: [{ role: "user", parts: [{ text: `${sistema}\n\n---\n\n${pedido}` }] }] }
+    : { system_instruction: { parts: [{ text: sistema }] }, contents: [{ role: "user", parts: [{ text: pedido }] }] };
+  const r = await fetch(`${API}/models/${modelo}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+    // Folga grande: os modelos Flash "pensam" antes e isso conta neste limite
+    body: JSON.stringify({ ...corpo, generationConfig: { temperature: 0.7, maxOutputTokens: 8192 } }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const cota = r.status === 429;
+    if (cota) descansando.set(modelo, Date.now() + PAUSA_COTA_MS);
+    console.warn(`[sugestão] ${modelo} recusou (${r.status}${cota ? ", cota do plano gratuito" : ""}):`, JSON.stringify(data?.error?.message ?? data).slice(0, 200));
+    motivoFalha = cota ? "limite" : motivoFalha ?? "erro";
+    return "pular";
   }
+  const texto = (data?.candidates?.[0]?.content?.parts ?? [])
+    .filter((p: any) => !p.thought).map((p: any) => p.text ?? "").join("").trim();
+  // tira aspas e rótulos que o modelo às vezes coloca em volta
+  const limpo = texto.replace(/^(resposta|sugest[aã]o|voc[eê]|atendente)\s*:\s*/i, "").replace(/^["“]|["”]$/g, "").trim();
+  if (!limpo) console.warn(`[sugestão] ${modelo} respondeu vazio:`, JSON.stringify(data?.candidates?.[0]?.finishReason ?? data?.promptFeedback ?? data).slice(0, 300));
+  return limpo || null;
+}
+
+async function chamarGemini(sistema: string, pedido: string): Promise<string | null> {
+  if (!GEMINI_API_KEY) { console.warn("[sugestão] falta o secret GEMINI_API_KEY"); motivoFalha = "erro"; return null; }
+  motivoFalha = null;
+  const lista = await modelos();
+  // os que estão descansando vão pro fim (se todos estiverem, tenta mesmo assim)
+  const agora = Date.now();
+  const ordem = [...lista.filter((m) => (descansando.get(m) ?? 0) <= agora), ...lista.filter((m) => (descansando.get(m) ?? 0) > agora)];
+  for (const modelo of ordem) {
+    try {
+      const r = await pedirAoModelo(modelo, sistema, pedido);
+      if (r === "pular") continue;
+      if (r) { motivoFalha = null; if (modelo !== lista[0]) console.log("[sugestão] saiu pelo modelo reserva", modelo); return r; }
+    } catch (e) {
+      console.error(`[sugestão] erro ao chamar ${modelo}:`, e);
+      motivoFalha = motivoFalha ?? "erro";
+    }
+  }
+  console.error("[sugestão] nenhum modelo conseguiu sugerir", ultimaFalha() === "limite" ? "(cota do plano gratuito esgotada)" : "");
+  return null;
 }
 
 // Gera e salva UMA sugestão pra conversa. Devolve o texto (ou null).
@@ -203,6 +274,6 @@ export async function gerarSugestao(conversa: Conversa, mensagemId: string | nul
     conversa_id: conversa.id, conta_id: conversa.conta_id, texto_sugerido: sugestao,
   });
   if (error) { console.error("[sugestão] não gravou:", error.message); return null; }
-  console.log("[sugestão] salva (modelo", GEMINI_MODEL + ")");
+  console.log("[sugestão] salva");
   return sugestao;
 }
