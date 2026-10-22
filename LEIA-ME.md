@@ -356,3 +356,11 @@ pronto, publicado) e as etapas gravar, editar, legenda e publicado.
 ### Excluir conversas
 
 Rode `supabase/sql/14_excluir_conversas.sql`. Conversas **arquivadas** ganham o botão **Excluir**: a conversa, as mensagens e as sugestões saem do painel. No Instagram ela continua, e o Relatório não muda. Se a pessoa escrever de novo, a conversa volta do zero.
+
+### Respostas manuais no Relatório
+
+`supabase/sql/15_atendimento_dm_manual.sql`: toda resposta enviada pela conta no Direct
+(painel, celular ou computador) conta como atendimento, inclusive em conversas antigas.
+Não contam aqui as mensagens dos robôs (já contam pelos envios das automações) nem a DM de
+resposta a comentário (conta como comentário). O histórico importado pela repescagem não
+entra no Relatório.
