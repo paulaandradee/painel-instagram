@@ -5,8 +5,8 @@
 // Protegido pelo header x-sched-key = SCHED_SECRET.
 // =====================================================================
 import {
-  Automation, checkSchedKey, db, findStep, firstStep, json, logDelivery, recordResult,
-  replyToComment, sendStep, takeSlot, upsertLead,
+  Automation, checkSchedKey, confirmarPeloEco, db, findStep, firstStep, json, logDelivery, recordResult,
+  replyToComment, saiuDesde, sendStep, takeSlot, upsertLead,
 } from "../_shared/ig.ts";
 
 const MAX_TENTATIVAS = 5;
@@ -34,6 +34,11 @@ async function drainQueue() {
     // Pede ficha ao freio DA CONTA. Sem ficha, tenta essa conta no próximo minuto.
     if (!(await takeSlot(item.conta_id))) { travadas.add(item.conta_id); resumo.segurados++; continue; }
 
+    // "Reserva" o item: se outra rodada já pegou, pula (nada sai em dobro)
+    const { data: reservado } = await db.from("ig_send_queue")
+      .update({ status: "enviando" }).eq("id", item.id).eq("status", "pendente").select("id");
+    if (!reservado?.length) continue;
+
     const { data: auto } = await db.from("ig_automations").select("*").eq("id", item.automation_id).maybeSingle();
     const step = auto ? firstStep(auto as Automation) : null;
     if (!auto || !step) {
@@ -42,7 +47,36 @@ async function drainQueue() {
       continue;
     }
 
+    // Já saiu uma mensagem pra essa pessoa desde que entrou na fila? Não manda de novo.
+    if (await saiuDesde(item.conta_id, item.ig_user_id, item.created_at)) {
+      await recordResult(item.conta_id, true, false); // devolve a ficha como uso normal
+      await db.from("ig_send_queue").update({ status: "enviado", last_error: "já tinha saído (eco)" }).eq("id", item.id);
+      continue;
+    }
+
+    const inicio = new Date(Date.now() - 5000).toISOString();
     const r = await sendStep(auto as Automation, step, { comment_id: item.comment_id }, item.ig_user_id);
+
+    // Erro ambíguo: a DM pode ter saído. Confere pelo eco e NUNCA tenta de novo.
+    if (!r.ok && r.ambiguo) {
+      const saiu = await confirmarPeloEco(item.conta_id, item.ig_user_id, inicio);
+      await recordResult(item.conta_id, saiu, false);
+      await logDelivery({
+        conta_id: item.conta_id, ig_user_id: item.ig_user_id, automation_id: auto.id, canal: "private_reply", tipo: r.tipo,
+        status: saiu ? "ok" : "incerto", motivo: `fila: ${saiu ? "entregue (confirmado pelo eco)" : "sem confirmação"}; Instagram: ${r.error}`,
+      });
+      await db.from("ig_send_queue").update({
+        status: saiu ? "enviado" : "incerto", tentativas: (item.tentativas ?? 0) + 1, last_error: r.error,
+        ...(saiu ? { sent_at: new Date().toISOString() } : {}),
+      }).eq("id", item.id);
+      if (saiu) {
+        await upsertLead(item.conta_id, item.ig_user_id, { username: item.username, last_source: "comment" });
+        if (item.responder_publico) await replyToComment(auto as Automation, item.comment_id);
+        resumo.enviados++;
+      } else resumo.erros++;
+      continue;
+    }
+
     await recordResult(item.conta_id, r.ok, r.hard);
     await logDelivery({
       conta_id: item.conta_id, ig_user_id: item.ig_user_id, automation_id: auto.id, canal: "private_reply", tipo: r.tipo,

@@ -11,7 +11,7 @@
 // - Salva o que saiu com autor "eu".
 // =====================================================================
 import { contaDoUsuario, CORS, reply, requireUser } from "../_shared/painel.ts";
-import { db, ENV, graphPost } from "../_shared/ig.ts";
+import { db, ENV, graphPost, isAmbiguous } from "../_shared/ig.ts";
 import { Conversa, gravarMensagem, Midia } from "../_shared/conversas.ts";
 
 const HORA_MS = 3600 * 1000;
@@ -84,6 +84,13 @@ Deno.serve(async (req) => {
     });
     if (!r.ok) {
       console.error("[enviar-resposta] Instagram recusou:", JSON.stringify(r.error));
+      if (isAmbiguous(r)) {
+        // Erro desconhecido do Instagram: a mensagem pode ter saído. Não deixa reenviar às cegas.
+        return reply({
+          ok: false, codigo: "incerto", enviados: ids.length,
+          erro: "O Instagram respondeu com um erro desconhecido, mas a mensagem pode ter saído. Confira no Direct (ou espere alguns segundos: se saiu, ela aparece aqui) antes de enviar de novo.",
+        }, 502);
+      }
       const foraDaJanela = Number(r.error?.code) === 10 || Number(r.error?.error_subcode) === 2534022;
       const semPermissao = humano && (foraDaJanela || [3, 200, 230].includes(Number(r.error?.code)));
       const erro = semPermissao

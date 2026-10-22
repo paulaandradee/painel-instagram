@@ -125,6 +125,10 @@ async function handleComment(conta: Conta, value: any) {
     await upsertLead(conta.id, fromId, {
       username, last_source: "comment", last_keyword: keyword, automation_id: auto.id,
     });
+  } else if (result === "incerto") {
+    // O Instagram deu erro ambíguo e o eco não confirmou: a DM PODE ter saído.
+    // Não libera o comentário para nova tentativa (melhor faltar que repetir).
+    await upsertLead(conta.id, fromId, { username, last_source: "comment", last_keyword: keyword, automation_id: auto.id });
   } else {
     // Falhou: libera o id pra que um reenvio do Meta possa tentar de novo
     await db.from("ig_processed_events").delete().eq("event_id", `comment:${commentId}`);

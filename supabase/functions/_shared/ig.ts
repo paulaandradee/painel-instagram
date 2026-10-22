@@ -144,6 +144,35 @@ export function isHardError(err: any): boolean {
   return [4, 17, 32, 368, 613].includes(code) || Number(err?.error_subcode) === 2446079;
 }
 
+// Erro "ambíguo": o Instagram respondeu erro, mas a mensagem PODE ter saído.
+// Visto em 22/10/2026: erro 1 "An unknown error has occurred" com a DM
+// entregue, e a fila tentou de novo 5 vezes (5 DMs iguais). Nesses casos
+// nunca tentar de novo nem cair no formato reserva: confirmar pelo eco.
+export function isAmbiguous(res: GraphResult): boolean {
+  const code = Number(res.error?.code);
+  return res.status === 0 || res.status >= 500 || code === 1 || code === 2;
+}
+
+// A conta mandou alguma mensagem pra essa pessoa desde "desde"? O webhook
+// grava o eco de tudo que sai (tabela mensagens), então isso confirma a entrega.
+export async function saiuDesde(contaId: string, igUserId: string, desde: string): Promise<boolean> {
+  const { data: conv } = await db.from("conversas").select("id")
+    .eq("conta_id", contaId).eq("instagram_user_id", igUserId).maybeSingle();
+  if (!conv) return false;
+  const { count } = await db.from("mensagens").select("id", { count: "exact", head: true })
+    .eq("conversa_id", conv.id).eq("autor", "eu").gte("criada_em", desde);
+  return (count ?? 0) > 0;
+}
+
+// Depois de um erro ambíguo: espera o eco chegar e confere se a mensagem saiu
+export async function confirmarPeloEco(contaId: string, igUserId: string, desde: string): Promise<boolean> {
+  for (const espera of [4000, 6000]) {
+    await new Promise((r) => setTimeout(r, espera));
+    if (await saiuDesde(contaId, igUserId, desde)) return true;
+  }
+  return false;
+}
+
 function errText(err: any): string {
   if (!err) return "erro desconhecido";
   return `${err.code ?? ""} ${err.error_subcode ?? ""} ${err.message ?? JSON.stringify(err)}`.trim();
@@ -256,9 +285,11 @@ export async function sendStep(
   step: FlowStep,
   recipient: Recipient,
   igUserId: string,
-): Promise<{ ok: boolean; hard: boolean; error?: string; tipo: string }> {
+): Promise<{ ok: boolean; hard: boolean; error?: string; tipo: string; ambiguo?: boolean }> {
   const conta = await contaPorId(auto.conta_id);
   if (!conta) return { ok: false, hard: false, error: "conta sem token ou desativada", tipo: "text" };
+  // Só cai no formato reserva quando o Instagram RECUSOU com certeza
+  const tentarReserva = (r: GraphResult) => !r.ok && !isHardError(r.error) && !isAmbiguous(r);
   const post = (body: unknown) => graphPost(conta.token, "/me/messages", body);
 
   // Botões válidos: com url (link) OU com next (avança). Sem destino = descartado.
@@ -284,7 +315,7 @@ export async function sendStep(
     });
 
     // 2) Fallback: pílulas (quick_reply). Link não vira pílula: vai no texto.
-    if (!res.ok && !isHardError(res.error)) {
+    if (tentarReserva(res)) {
       console.warn("[sendStep] button template recusado, tentando quick_reply:", errText(res.error));
       const links = buttons.filter((b) => b.url).map((b) => `${b.title || "Acessar"}: ${b.url}`);
       const qrs = buttons.filter((b) => !b.url).slice(0, QUICK_REPLIES_MAX).map((b) => ({
@@ -299,7 +330,7 @@ export async function sendStep(
     }
 
     // 3) Último recurso: texto puro (com os links no texto)
-    if (!res.ok && !isHardError(res.error)) {
+    if (tentarReserva(res)) {
       console.warn("[sendStep] quick_reply recusado, mandando texto puro:", errText(res.error));
       const links = buttons.filter((b) => b.url).map((b) => `${b.title || "Acessar"}: ${b.url}`);
       res = await post({ recipient, message: { text: [text, ...links].join("\n\n") } });
@@ -309,7 +340,7 @@ export async function sendStep(
   }
 
   if (!res.ok) {
-    return { ok: false, hard: isHardError(res.error), error: errText(res.error), tipo };
+    return { ok: false, hard: isHardError(res.error), error: errText(res.error), tipo, ambiguo: isAmbiguous(res) };
   }
 
   await rememberMid(res.data?.message_id);
@@ -357,7 +388,7 @@ export async function sendStep(
 export async function deliverAutomation(
   auto: Automation,
   ctx: { commentId: string; igUserId: string; username?: string },
-): Promise<"ok" | "throttled" | "erro"> {
+): Promise<"ok" | "throttled" | "erro" | "incerto"> {
   const base = { conta_id: auto.conta_id, ig_user_id: ctx.igUserId, automation_id: auto.id, canal: "private_reply" };
   const step = firstStep(auto);
   if (!step) {
@@ -383,7 +414,15 @@ export async function deliverAutomation(
     return "throttled";
   }
 
+  const inicio = new Date(Date.now() - 5000).toISOString();
   const r = await sendStep(auto, step, { comment_id: ctx.commentId }, ctx.igUserId);
+  if (!r.ok && r.ambiguo) {
+    // Pode ter saído: confere pelo eco e NUNCA tenta de novo
+    const saiu = await confirmarPeloEco(auto.conta_id, ctx.igUserId, inicio);
+    await recordResult(auto.conta_id, saiu, false);
+    await logDelivery({ ...base, tipo: r.tipo, status: saiu ? "ok" : "incerto", motivo: `${saiu ? "entregue (confirmado pelo eco)" : "sem confirmação"}; Instagram: ${r.error}` });
+    return saiu ? "ok" : "incerto";
+  }
   await recordResult(auto.conta_id, r.ok, r.hard);
   await logDelivery({ ...base, tipo: r.tipo, status: r.ok ? "ok" : "erro", motivo: r.error });
   return r.ok ? "ok" : "erro";
