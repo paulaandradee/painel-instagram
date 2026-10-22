@@ -72,7 +72,9 @@
       posts,
       comentaristas: { escopo: esc, posts_analisados: todos ? 138 : 10, comentarios_analisados: todos ? 4252 : 164, pessoas: todos ? 2980 : 156,
         atualizado_em: new Date().toISOString(),
-        ranking: ["ana.souza", "brunolima", "carla_m", "diego.alves", "elisarocha", "fabionunes"].map((username, i) => ({ username, total: (todos ? 40 : 9) - i * 2 })) },
+        ranking: ["ana.souza", "brunolima", "carla_m", "diego.alves", "elisarocha", "fabionunes"].map((username, i) => ({ username, total: (todos ? 40 : 9) - i * 2 })),
+        recorrentes: ["Eu quero", "Quero 🧡", "Como funciona?", "Tenho interesse", "🔥", "Amei", "(marcou alguém)", "Quanto custa?"]
+          .map((texto, i) => ({ texto, total: (todos ? 320 : 48) - i * (todos ? 35 : 5), pessoas: (todos ? 300 : 45) - i * (todos ? 33 : 5) })) },
     };
   }
 
@@ -183,10 +185,34 @@
           </div>
         </div>
         <div id="an-ranking"></div>
+      </div>
+
+      <div class="cartao" style="margin-top:16px">
+        <h2 class="titulo-card">💬 Comentários mais recorrentes <span class="dica-titulo">(os mesmos posts do ranking acima)</span></h2>
+        <div id="an-recorrentes"></div>
       </div>`;
     pintarIcones($("#aba-metricas"));
     renderPosts();
     renderRanking();
+    renderRecorrentes();
+  }
+
+  // Top 10 comentários que se repetem (vem na mesma leitura do ranking)
+  function renderRecorrentes() {
+    const c = dados.comentaristas;
+    const alvo = $("#an-recorrentes");
+    if (!c) { alvo.innerHTML = `<div class="info-atualizacao">🕘 Clique em <strong>Analisar comentários</strong> (no quadro acima) pra ver os comentários que mais se repetem.</div>`; return; }
+    if (!c.recorrentes) { alvo.innerHTML = `<div class="info-atualizacao">🕘 Clique em <strong>Atualizar ranking</strong> (no quadro acima) pra ver os comentários que mais se repetem.</div>`; return; }
+    if (!c.recorrentes.length) { alvo.innerHTML = `<p class="texto-2">Nenhum comentário se repetiu nesses posts.</p>`; return; }
+    const max = Math.max(1, ...c.recorrentes.map((r) => r.total));
+    alvo.innerHTML = `
+      <ol class="ranking ranking-frases">${c.recorrentes.map((r) => `
+        <li>
+          <span class="frase" title="${esc(r.texto)}">"${esc(r.texto)}"</span>
+          <span class="barra-rank" aria-hidden="true"><span style="width:${(r.total / max) * 100}%"></span></span>
+          <span class="num" title="${n(r.total)} vezes, de ${n(r.pessoas)} ${r.pessoas === 1 ? "pessoa" : "pessoas"}">${n(r.total)}×</span>
+        </li>`).join("")}</ol>
+      <p class="ajuda" style="margin-bottom:0">Maiúsculas, acentos, pontuação e emojis no meio do texto não importam ("Eu quero!" e "eu quero 🙏" contam juntos). Passe o mouse no número pra ver de quantas pessoas vieram.</p>`;
   }
 
   function renderPosts() {

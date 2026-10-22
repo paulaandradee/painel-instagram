@@ -178,17 +178,19 @@ async function modelos(): Promise<string[]> {
 
 // Um pedido a UM modelo. Devolve o texto, "pular" (cota, fora do ar, modelo
 // inexistente: tenta o próximo) ou null (resposta vazia).
-async function pedirAoModelo(modelo: string, sistema: string, pedido: string): Promise<string | "pular" | null> {
-  // Gemma não aceita instrução de sistema: vai junto do pedido
+async function pedirAoModelo(modelo: string, sistema: string, pedido: string, json = false): Promise<string | "pular" | null> {
+  // Gemma não aceita instrução de sistema nem o modo JSON: vai tudo no pedido
   const ehGemma = modelo.startsWith("gemma");
   const corpo = ehGemma
     ? { contents: [{ role: "user", parts: [{ text: `${sistema}\n\n---\n\n${pedido}` }] }] }
     : { system_instruction: { parts: [{ text: sistema }] }, contents: [{ role: "user", parts: [{ text: pedido }] }] };
+  const config: Record<string, unknown> = { temperature: json ? 0.3 : 0.7, maxOutputTokens: 8192 };
+  if (json && !ehGemma) config.responseMimeType = "application/json";
   const r = await fetch(`${API}/models/${modelo}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
     // Folga grande: os modelos Flash "pensam" antes e isso conta neste limite
-    body: JSON.stringify({ ...corpo, generationConfig: { temperature: 0.7, maxOutputTokens: 8192 } }),
+    body: JSON.stringify({ ...corpo, generationConfig: config }),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
@@ -206,7 +208,7 @@ async function pedirAoModelo(modelo: string, sistema: string, pedido: string): P
   return limpo || null;
 }
 
-async function chamarGemini(sistema: string, pedido: string): Promise<string | null> {
+async function chamarGemini(sistema: string, pedido: string, json = false): Promise<string | null> {
   if (!GEMINI_API_KEY) { console.warn("[sugestão] falta o secret GEMINI_API_KEY"); motivoFalha = "erro"; return null; }
   motivoFalha = null;
   const lista = await modelos();
@@ -215,7 +217,7 @@ async function chamarGemini(sistema: string, pedido: string): Promise<string | n
   const ordem = [...lista.filter((m) => (descansando.get(m) ?? 0) <= agora), ...lista.filter((m) => (descansando.get(m) ?? 0) > agora)];
   for (const modelo of ordem) {
     try {
-      const r = await pedirAoModelo(modelo, sistema, pedido);
+      const r = await pedirAoModelo(modelo, sistema, pedido, json);
       if (r === "pular") continue;
       if (r) { motivoFalha = null; if (modelo !== lista[0]) console.log("[sugestão] saiu pelo modelo reserva", modelo); return r; }
     } catch (e) {
@@ -276,4 +278,89 @@ export async function gerarSugestao(conversa: Conversa, mensagemId: string | nul
   if (error) { console.error("[sugestão] não gravou:", error.message); return null; }
   console.log("[sugestão] salva");
   return sugestao;
+}
+
+// ---------- Análise das conversas do dia ----------
+// Lê as conversas do Direct de um dia (horário de Brasília), sem dados
+// pessoais, e pede à IA: resumo, dúvidas, objeções e perfil dos leads.
+// Guarda em analises_conversas (o painel só lê).
+const MAX_CONVERSAS_ANALISE = 80;
+const MAX_MSGS_POR_CONVERSA = 20;
+
+type ItemAnalise = { tema: string; vezes: number; exemplo?: string };
+export type Analise = { resumo: string; duvidas: ItemAnalise[]; objecoes: ItemAnalise[]; perfil: ItemAnalise[] };
+
+function lista(v: unknown): ItemAnalise[] {
+  if (!Array.isArray(v)) return [];
+  return v.slice(0, 8).map((x: any) => ({
+    tema: String(x?.tema ?? x?.caracteristica ?? "").trim().slice(0, 160),
+    vezes: Math.max(1, Math.round(Number(x?.vezes ?? 1)) || 1),
+    exemplo: x?.exemplo ? String(x.exemplo).trim().slice(0, 220) : undefined,
+  })).filter((x) => x.tema);
+}
+
+export async function analisarDia(contaId: string, dia: string):
+  Promise<{ ok: true; vazio?: boolean; analise?: Analise; conversas: number; mensagens: number } | { ok: false; motivo: "limite" | "erro" }> {
+  const de = new Date(`${dia}T00:00:00-03:00`);
+  const ate = new Date(de.getTime() + 24 * 3600 * 1000);
+  const { data: msgs } = await db.from("mensagens").select("conversa_id, autor, texto, criada_em")
+    .eq("conta_id", contaId).gte("criada_em", de.toISOString()).lt("criada_em", ate.toISOString())
+    .order("criada_em", { ascending: true }).limit(3000);
+
+  // agrupa por conversa; só as que tiveram mensagem da cliente no dia
+  const porConversa = new Map<string, { autor: string; texto: string }[]>();
+  for (const m of msgs ?? []) {
+    if (!porConversa.has(m.conversa_id)) porConversa.set(m.conversa_id, []);
+    porConversa.get(m.conversa_id)!.push(m);
+  }
+  const ids = [...porConversa.keys()].filter((id) => porConversa.get(id)!.some((m) => m.autor === "cliente"))
+    .slice(0, MAX_CONVERSAS_ANALISE);
+  if (!ids.length) return { ok: true, vazio: true, conversas: 0, mensagens: 0 };
+
+  const { data: convs } = await db.from("conversas").select("id, nome, username").in("id", ids);
+  const perfil = new Map((convs ?? []).map((c) => [c.id, c]));
+  let total = 0;
+  const blocos = ids.map((id, i) => {
+    const c = perfil.get(id) ?? { nome: null, username: null };
+    const linhas = porConversa.get(id)!.slice(-MAX_MSGS_POR_CONVERSA).map((m) => {
+      total++;
+      return `${m.autor === "cliente" ? "Cliente" : "Atendente"}: ${anonimizar(String(m.texto).slice(0, 300), c)}`;
+    });
+    return `### Conversa ${i + 1}\n${linhas.join("\n")}`;
+  });
+
+  const { data: roteiro } = await db.from("abordagem").select("texto").eq("conta_id", contaId).maybeSingle();
+  const sistema = [
+    "Você analisa as conversas do direct do Instagram de UM dia para o time comercial.",
+    "Responda SOMENTE com um JSON válido, neste formato:",
+    '{"resumo":"2 ou 3 frases sobre o dia","duvidas":[{"tema":"...","vezes":3,"exemplo":"trecho curto"}],"objecoes":[{"tema":"...","vezes":2,"exemplo":"..."}],"perfil":[{"tema":"característica ou realidade dos leads","vezes":4,"exemplo":"..."}]}',
+    "Regras:",
+    "- Português do Brasil, direto e útil para quem vende.",
+    "- duvidas: o que as clientes perguntaram (preço, como funciona, tempo, garantia...).",
+    "- objecoes: o que trava a compra (caro, sem tempo, medo de golpe, vou pensar, precisa falar com o marido...).",
+    "- perfil: quem são e qual a realidade delas (mães, renda extra, já tentaram outras coisas, desempregadas, CLT...).",
+    "- vezes = em quantas conversas diferentes apareceu (estimativa honesta). Ordene do mais frequente.",
+    "- exemplo = trecho curto e real de uma mensagem da Cliente, sem nomes nem dados pessoais.",
+    "- No máximo 6 itens por lista. Não invente: se não aparecer nada, deixe a lista vazia.",
+    "",
+    "Contexto do que a conta vende (roteiro do time, para entender as conversas):",
+    ((roteiro?.texto ?? "").trim() || "(sem roteiro cadastrado)").slice(0, 4000),
+  ].join("\n");
+  const pedido = `Conversas do dia ${dia} (${ids.length} conversas):\n\n${blocos.join("\n\n")}`;
+
+  const bruto = await chamarGemini(sistema, pedido, true);
+  if (!bruto) return { ok: false, motivo: ultimaFalha() === "limite" ? "limite" : "erro" };
+  let dados: any;
+  try { dados = JSON.parse(bruto.slice(bruto.indexOf("{"), bruto.lastIndexOf("}") + 1)); }
+  catch { console.error("[análise] a IA não devolveu JSON:", bruto.slice(0, 300)); return { ok: false, motivo: "erro" }; }
+
+  const analise: Analise = {
+    resumo: String(dados?.resumo ?? "").trim().slice(0, 600),
+    duvidas: lista(dados?.duvidas), objecoes: lista(dados?.objecoes), perfil: lista(dados?.perfil),
+  };
+  const { error } = await db.from("analises_conversas").upsert({
+    conta_id: contaId, dia, dados: analise, conversas: ids.length, mensagens: total, criada_em: new Date().toISOString(),
+  }, { onConflict: "conta_id,dia" });
+  if (error) console.error("[análise] não gravou:", error.message);
+  return { ok: true, analise, conversas: ids.length, mensagens: total };
 }

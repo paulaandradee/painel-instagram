@@ -344,6 +344,8 @@ a { color: var(--destaque); }
 .ranking li { display: grid; grid-template-columns: 26px minmax(110px, 200px) 1fr 44px; align-items: center; gap: 10px; counter-increment: pos; font-size: 13.5px; }
 .ranking li::before { content: counter(pos) "º"; color: var(--texto-3); font-weight: 650; font-size: 12.5px; }
 .ranking a { text-decoration: none; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranking-frases li { grid-template-columns: 26px minmax(140px, 340px) 1fr 52px; }
+.ranking-frases .frase { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .barra-rank { height: 8px; background: var(--superficie-2); border-radius: 4px; overflow: hidden; }
 .barra-rank span { display: block; height: 100%; background: var(--destaque); border-radius: 4px; }
 @media (max-width: 600px) {
@@ -601,6 +603,14 @@ details.avancado .grade2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8
 .rel-tabela tfoot td { font-weight: 700; border-top: 2px solid var(--borda); padding: 10px 12px; }
 .rel-tabela tr.rel-zero td { color: var(--texto-3); }
 @media (max-width: 600px) { .rel-kpis { grid-template-columns: 1fr; } }
+.rel-analise { margin-top: 16px; }
+.rel-resumo { margin: 8px 0 14px; padding: 10px 14px; background: var(--destaque-suave); border-radius: var(--raio-p); line-height: 1.55; }
+.rel-analise-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.rel-analise-col h3 { font-size: 14px; font-weight: 650; margin: 0 0 8px; }
+.rel-analise-col ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; font-size: 13.5px; }
+.rel-vezes { color: var(--texto-2); font-size: 12px; white-space: nowrap; }
+.rel-exemplo { color: var(--texto-2); font-style: italic; font-size: 12.5px; margin-top: 2px; }
+@media (max-width: 900px) { .rel-analise-grade { grid-template-columns: 1fr; } }
 
 /* ---------- Conversas (caixa de entrada com sugestão da IA) ---------- */
 .cx { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; height: calc(100vh - 230px); min-height: 480px; }

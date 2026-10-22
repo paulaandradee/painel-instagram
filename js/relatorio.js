@@ -146,7 +146,66 @@
         ${grafico(grupos)}
       </div>` : ""}
       ${periodo !== "dia" ? `<div style="margin-top:16px">${tabela(grupos)}</div>` : ""}
-      <p class="ajuda">Cada pessoa conta 1 vez por dia em cada canal: respondida no comentário e no Direct no mesmo dia conta 2. No dia seguinte, conta de novo. Entram as respostas das automações, as do painel e as feitas pelo celular.</p>`;
+      <p class="ajuda">Cada pessoa conta 1 vez por dia em cada canal: respondida no comentário e no Direct no mesmo dia conta 2. No dia seguinte, conta de novo. Entram as respostas das automações, as do painel e as feitas pelo celular.</p>
+      ${periodo === "dia" ? `<div class="cartao rel-analise" id="rel-analise"></div>` : ""}`;
+    if (periodo === "dia") carregarAnalise(iso(faixa.de));
+  }
+
+  // ---------------- Análise das conversas do dia (IA) ----------------
+  // A análise fica guardada: abrir não gasta a cota da IA, só o botão.
+  async function carregarAnalise(dia) {
+    const alvo = $("#rel-analise");
+    if (!alvo) return;
+    const { data, error } = await sb.from("analises_conversas").select("*").eq("conta_id", App.conta.id).eq("dia", dia).maybeSingle();
+    if ($("#rel-analise") !== alvo) return; // trocou de dia enquanto carregava
+    if (error) { alvo.innerHTML = `<p class="texto-2">Não foi possível ler a análise. Rodou o 17_analise_conversas.sql?</p>`; return; }
+    renderAnalise(alvo, dia, data);
+  }
+
+  function renderAnalise(alvo, dia, salvo, vazio = false) {
+    const ehHoje = dia === iso(new Date());
+    const topo = (rotulo) => `<div class="linha-entre" style="flex-wrap:wrap;gap:8px">
+        <h2 class="titulo-card">🧠 Análise das conversas do dia</h2>
+        <button class="btn btn-p" data-rel="analisar" data-dia="${dia}">✨ ${rotulo}</button></div>`;
+    if (vazio) { alvo.innerHTML = `${topo("Gerar análise")}<p class="texto-2">Nenhuma conversa no Direct neste dia.</p>`; return; }
+    if (!salvo) {
+      alvo.innerHTML = `${topo("Gerar análise")}
+        <p class="texto-2" style="margin:6px 0 0">A IA lê as conversas do Direct deste dia (sem nomes nem dados pessoais) e resume as principais dúvidas, objeções e o perfil dos leads.${ehHoje ? " Como o dia ainda não acabou, vale gerar de novo mais tarde." : ""}</p>`;
+      return;
+    }
+    const a = salvo.dados || {};
+    const coluna = (titulo, itens, vazioTxt) => `<div class="rel-analise-col"><h3>${titulo}</h3>${
+      itens?.length ? `<ol>${itens.map((x) => `<li><strong>${esc(x.tema)}</strong> <span class="rel-vezes">em ${n(x.vezes)} conversa${x.vezes === 1 ? "" : "s"}</span>${
+        x.exemplo ? `<div class="rel-exemplo">"${esc(x.exemplo)}"</div>` : ""}</li>`).join("")}</ol>` : `<p class="texto-2 pequeno">${vazioTxt}</p>`}</div>`;
+    const hora = new Date(salvo.criada_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    alvo.innerHTML = `${topo("Atualizar análise")}
+      ${a.resumo ? `<p class="rel-resumo">${esc(a.resumo)}</p>` : ""}
+      <div class="rel-analise-grade">
+        ${coluna("❓ Principais dúvidas", a.duvidas, "Nenhuma dúvida apareceu.")}
+        ${coluna("🚧 Objeções", a.objecoes, "Nenhuma objeção apareceu.")}
+        ${coluna("👩 Perfil e realidade dos leads", a.perfil, "Sem informação suficiente.")}
+      </div>
+      <p class="ajuda" style="margin-bottom:0">Feita pela IA em ${esc(hora)}, a partir de ${n(salvo.conversas)} conversa${salvo.conversas === 1 ? "" : "s"} (${n(salvo.mensagens)} mensagens), sem nomes nem dados pessoais. Os números são estimativas: use como termômetro.${ehHoje ? " O dia ainda não acabou: atualize mais tarde para incluir as próximas conversas." : ""}</p>`;
+  }
+
+  async function gerarAnalise(botao) {
+    const dia = botao.dataset.dia;
+    const alvo = $("#rel-analise");
+    botao.disabled = true; botao.textContent = "Analisando as conversas...";
+    let r;
+    try {
+      const { data, error } = await sb.functions.invoke("conversas-acoes", { body: { acao: "analisar_dia", conta_id: App.conta.id, dia } });
+      if (error) {
+        let msg = "Não foi possível analisar agora.";
+        try { const c = await error.context?.json?.(); if (c?.erro) msg = c.erro; } catch { /* mantém */ }
+        r = { ok: false, erro: msg };
+      } else r = data;
+    } catch { r = { ok: false, erro: "Não foi possível falar com o servidor agora." }; }
+    if ($("#rel-analise") !== alvo) return;
+    if (!r?.ok) { botao.disabled = false; botao.textContent = "✨ Tentar de novo"; return aviso(r?.erro || "Não foi possível analisar agora.", "erro"); }
+    if (r.vazio) return renderAnalise(alvo, dia, null, true);
+    renderAnalise(alvo, dia, { dados: r.analise, conversas: r.conversas, mensagens: r.mensagens, criada_em: new Date().toISOString() });
+    aviso("Análise pronta.", "ok");
   }
 
   // ---------------- Eventos ----------------
@@ -159,6 +218,7 @@
     if (b.dataset.rel === "anterior") mover(-1);
     if (b.dataset.rel === "proximo") mover(1);
     if (b.dataset.rel === "hoje") { ref = new Date(); carregar(); }
+    if (b.dataset.rel === "analisar") gerarAnalise(b);
   });
 
   window.Relatorio = { carregar };

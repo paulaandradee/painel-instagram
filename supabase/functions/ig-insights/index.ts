@@ -138,16 +138,31 @@ async function postsDoPeriodo(conta: Conta, dias: number) {
   });
 }
 
+// Chave pra juntar comentários iguais: "Eu quero!", "eu quero" e "EU QUERO 🙏"
+// viram "eu quero". Marcação de amigo (@fulana) sai; só marcação vira "(marcou alguém)".
+function chaveComentario(texto: string): string {
+  const semMarcacao = texto.replace(/@[\w.]+/g, " ");
+  const k = semMarcacao.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[\p{Extended_Pictographic}️‍]/gu, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  if (k) return k;
+  // só emoji: junta pelo emoji (🔥🔥 e 🔥 viram 🔥)
+  const emojis = [...new Set(texto.match(/\p{Extended_Pictographic}/gu) ?? [])].join("");
+  return emojis || (/@[\w.]+/.test(texto) ? "(marcou alguém)" : "");
+}
+
 // Ranking de quem mais comenta (lê os comentários dos posts do período)
+// e, na mesma leitura, os comentários que mais se repetem
 async function comentaristas(conta: Conta, posts: { id: string }[], meuUsername: string, maxPosts: number) {
   const contagem = new Map<string, number>();
+  const frases = new Map<string, { texto: string; total: number; pessoas: Set<string> }>();
   let total = 0;
   const alvo = posts.slice(0, maxPosts);
   await emLotes(alvo, 5, async (p) => {
     let after: string | undefined;
     for (let pag = 0; pag < MAX_PAGINAS_COMENTARIOS; pag++) {
       // "username" no comentário vem vazio nesta API: quem comentou vem em "from"
-      const params: Record<string, string> = { fields: "from", limit: "50" };
+      const params: Record<string, string> = { fields: "from,text", limit: "50" };
       if (after) params.after = after;
       const r = await graphGet(conta.token, `/${p.id}/comments`, params);
       if (!r.ok) break;
@@ -157,13 +172,26 @@ async function comentaristas(conta: Conta, posts: { id: string }[], meuUsername:
         if (!u || u === meuUsername || c.from?.id === conta.ig_user_id) continue;
         contagem.set(u, (contagem.get(u) ?? 0) + 1);
         total++;
+        const texto = String(c.text ?? "").trim();
+        const k = chaveComentario(texto);
+        if (k) {
+          const mostrar = k === "(marcou alguém)" ? k : texto.replace(/@[\w.]+/g, "@…").replace(/\s+/g, " ").slice(0, 120);
+          const f = frases.get(k) ?? { texto: mostrar, total: 0, pessoas: new Set<string>() };
+          f.total++;
+          f.pessoas.add(u);
+          frases.set(k, f);
+        }
       }
       after = r.data?.paging?.cursors?.after;
       if (!after || !r.data?.paging?.next) break;
     }
   });
   const ranking = [...contagem].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([username, n]) => ({ username, total: n }));
-  return { posts_analisados: alvo.length, comentarios_analisados: total, pessoas: contagem.size, ranking };
+  // Top 10 que se repetem (pelo menos 2 vezes): o texto mostrado é o primeiro jeito em que apareceu
+  const recorrentes = [...frases.values()].filter((f) => f.total >= 2)
+    .sort((a, b) => b.total - a.total || b.pessoas.size - a.pessoas.size).slice(0, 10)
+    .map((f) => ({ texto: f.texto, total: f.total, pessoas: f.pessoas.size }));
+  return { posts_analisados: alvo.length, comentarios_analisados: total, pessoas: contagem.size, ranking, recorrentes };
 }
 
 async function guardar(chave: string, dados: unknown) {

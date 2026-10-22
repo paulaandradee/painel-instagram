@@ -3,6 +3,9 @@
 // Corpo (POST):
 // - { acao: "sugerir", conversa_id }
 //     gera uma sugestão na hora (conversa antiga, ou "outra sugestão").
+// - { acao: "analisar_dia", conta_id, dia: "AAAA-MM-DD" }
+//     a IA lê as conversas do dia (sem dados pessoais) e devolve resumo,
+//     dúvidas, objeções e perfil dos leads; guarda em analises_conversas.
 // - { acao: "repescar", conta_id, etapa: "previa" | "trazer" }
 //     lê as conversas do Direct dos últimos 7 dias em que a ÚLTIMA
 //     mensagem é da cliente (sem resposta) e traz para o painel.
@@ -12,7 +15,7 @@
 // =====================================================================
 import { contaDoUsuario, CORS, reply, requireUser } from "../_shared/painel.ts";
 import { Conta, db, ehDaConta, graphGet } from "../_shared/ig.ts";
-import { Conversa, conversaDe, gerarSugestao, Midia, ultimaFalha } from "../_shared/conversas.ts";
+import { analisarDia, Conversa, conversaDe, gerarSugestao, Midia, ultimaFalha } from "../_shared/conversas.ts";
 
 const DIA_MS = 24 * 3600 * 1000;
 const JANELA_MS = 7 * DIA_MS;
@@ -129,6 +132,22 @@ Deno.serve(async (req) => {
       return reply({ ok: false, codigo: ultimaFalha() ?? "erro", erro }, 502);
     }
     return reply({ ok: true, texto });
+  }
+
+  // ---------------- Análise das conversas do dia ----------------
+  if (corpo.acao === "analisar_dia") {
+    const conta = await contaDoUsuario(userId, String(corpo.conta_id ?? ""));
+    if (!conta) return reply({ ok: false, erro: "Sem acesso a esta conta." }, 403);
+    const dia = String(corpo.dia ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return reply({ ok: false, erro: "Dia inválido." }, 400);
+    const r = await analisarDia(conta.id, dia);
+    if (!r.ok) {
+      const erro = r.motivo === "limite"
+        ? "O limite gratuito da IA foi atingido agora. Tente de novo mais tarde."
+        : "A IA não conseguiu analisar agora. Tente de novo em instantes.";
+      return reply({ ok: false, codigo: r.motivo, erro }, 502);
+    }
+    return reply(r);
   }
 
   // ---------------- Repescagem do Direct ----------------

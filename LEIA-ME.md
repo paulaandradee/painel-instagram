@@ -364,3 +364,17 @@ Rode `supabase/sql/14_excluir_conversas.sql` e `16_excluir_tira_do_relatorio.sql
 Não contam aqui as mensagens dos robôs (já contam pelos envios das automações) nem a DM de
 resposta a comentário (conta como comentário). O histórico importado pela repescagem não
 entra no Relatório.
+
+### Comentários mais recorrentes (Análises)
+
+No quadro **Quem mais comenta**, o mesmo botão (**Analisar comentários** / **Atualizar
+ranking**) também monta o **Top 10 dos comentários que mais se repetem**, nos mesmos posts.
+Maiúsculas, acentos, pontuação e emojis no meio do texto não importam; marcações de amigos
+aparecem como "@…" (e só marcação vira "(marcou alguém)").
+
+### Análise das conversas do dia (Relatório)
+
+Rode `supabase/sql/17_analise_conversas.sql`. No **Relatório > Dia**, o botão **Gerar análise**
+pede à IA um resumo do dia, as principais **dúvidas**, **objeções** e o **perfil/realidade dos
+leads**, a partir das conversas do Direct daquele dia (sem nomes nem dados pessoais). A análise
+fica guardada; só o botão gera outra (cada uma gasta 1 pedido da cota gratuita da IA).
