@@ -19,32 +19,40 @@ export type Conversa = {
   ultima_do_cliente_em: string | null;
 };
 
-// Acha (ou cria) a conversa da pessoa. Na criação, tenta buscar nome e @.
-export async function conversaDe(conta: Conta, igUserId: string): Promise<Conversa | null> {
+// Acha (ou cria) a conversa da pessoa. Na criação, usa o perfil recebido
+// ou tenta buscar nome e @ na API.
+export async function conversaDe(
+  conta: Conta, igUserId: string, perfilConhecido?: { nome?: string | null; username?: string | null },
+): Promise<Conversa | null> {
   const { data: existe } = await db.from("conversas").select("*")
     .eq("conta_id", conta.id).eq("instagram_user_id", igUserId).maybeSingle();
   if (existe) return existe as Conversa;
 
-  // A API só libera o perfil depois que a pessoa mandou mensagem: melhor esforço
-  const perfil = await graphGet(conta.token, `/${igUserId}`, { fields: "name,username" });
+  let nome = perfilConhecido?.nome ?? null;
+  let username = perfilConhecido?.username ?? null;
+  if (!nome) {
+    // A API só libera o perfil depois que a pessoa mandou mensagem: melhor esforço
+    const perfil = await graphGet(conta.token, `/${igUserId}`, { fields: "name,username" });
+    if (perfil.ok) { nome = perfil.data?.name ?? null; username = username ?? perfil.data?.username ?? null; }
+  }
   const { data, error } = await db.from("conversas").upsert({
-    conta_id: conta.id,
-    instagram_user_id: igUserId,
-    nome: perfil.ok ? perfil.data?.name ?? null : null,
-    username: perfil.ok ? perfil.data?.username ?? null : null,
+    conta_id: conta.id, instagram_user_id: igUserId, nome, username,
   }, { onConflict: "conta_id,instagram_user_id" }).select().single();
   if (error) { console.error("[conversa] não criou:", error.message); return null; }
   return data as Conversa;
 }
 
+export type Midia = { tipo: string; url: string | null };
+
 // Salva uma mensagem. Devolve o id, ou null se ela já estava salva
 // (o mesmo "mid" chega de novo como eco ou reenvio do Meta).
 export async function gravarMensagem(
-  conversa: Conversa, autor: "cliente" | "eu", texto: string, mid: string | null, quando: Date,
+  conversa: Conversa, autor: "cliente" | "eu", texto: string, mid: string | null, quando: Date, midia?: Midia | null,
 ): Promise<string | null> {
   const linha = {
     conversa_id: conversa.id, conta_id: conversa.conta_id, autor, texto,
     criada_em: quando.toISOString(), instagram_message_id: mid,
+    midia_tipo: midia?.tipo ?? null, midia_url: midia?.url ?? null,
   };
   const { data, error } = await db.from("mensagens")
     .upsert(linha, { onConflict: "instagram_message_id", ignoreDuplicates: true })
@@ -53,21 +61,41 @@ export async function gravarMensagem(
   return data?.id ?? null;
 }
 
+const NOMES_ANEXO: Record<string, string> = {
+  image: "imagem", video: "vídeo", audio: "áudio", file: "arquivo", share: "post compartilhado",
+  story_mention: "menção no story", ig_reel: "reels", reel: "reels", like_heart: "❤️", sticker: "figurinha",
+};
+
 // Texto que vai pro histórico quando a mensagem não é só texto
 export function textoDoEvento(msg: any, postback: any): string {
   if (msg?.text) return String(msg.text);
   if (postback?.title) return `[tocou no botão: ${postback.title}]`;
   const tipo = msg?.attachments?.[0]?.type;
-  if (tipo) return `[${{ image: "imagem", video: "vídeo", audio: "áudio", file: "arquivo", share: "post compartilhado", story_mention: "menção no story" }[tipo as string] ?? "anexo"}]`;
+  if (tipo === "like_heart") return "❤️";
+  if (tipo) return `[${NOMES_ANEXO[tipo as string] ?? "anexo"}]`;
   if (msg?.attachment || msg?.is_echo) return "[mensagem automática]";
   return "";
+}
+
+// A mídia do evento (pro painel mostrar a foto, o áudio...). Os links do
+// Instagram expiram depois de um tempo; aí o painel mostra só o texto.
+export function midiaDoEvento(msg: any): Midia | null {
+  const a = msg?.attachments?.[0];
+  if (!a?.type) return null;
+  const url = a.payload?.url ?? null;
+  if (a.type === "like_heart") return { tipo: "like_heart", url: null };
+  if (!url) return null;
+  return { tipo: a.type, url };
 }
 
 // ---------- Anonimização: nada de nome, @, e-mail ou telefone pra IA ----------
 const escRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export function anonimizar(texto: string, conversa: Pick<Conversa, "nome" | "username">): string {
-  let t = texto;
+  // e-mail e telefone primeiro (senão o nome dentro do e-mail vira "Cliente@...")
+  let t = texto
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "[e-mail]")
+    .replace(/(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}/g, "[telefone]");
   const termos = new Set<string>();
   if (conversa.username) { termos.add(`@${conversa.username}`); termos.add(conversa.username); }
   if (conversa.nome) {
@@ -79,10 +107,7 @@ export function anonimizar(texto: string, conversa: Pick<Conversa, "nome" | "use
   for (const termo of [...termos].sort((a, b) => b.length - a.length)) {
     t = t.replace(new RegExp(`(?<![\\p{L}\\p{N}_.])${escRegex(termo)}(?![\\p{L}\\p{N}_])`, "giu"), "Cliente");
   }
-  return t
-    .replace(/@[A-Za-z0-9._]{2,30}/g, "@perfil")                      // outros @
-    .replace(/[^\s@]+@[^\s@]+\.[^\s@]{2,}/g, "[e-mail]")
-    .replace(/(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}/g, "[telefone]");
+  return t.replace(/@[A-Za-z0-9._]{2,30}/g, "@perfil"); // outros @
 }
 
 // A IA escreve [nome]; aqui, já fora do Google, entra o primeiro nome.
@@ -95,12 +120,12 @@ export function colocarNome(texto: string, nome: string | null): string {
     const bonito = primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase();
     return texto.replace(MARCADOR_NOME, bonito);
   }
-  return texto
-    .replace(/,?[ \t]*\[(?:primeiro\s+)?nome\][ \t]*(?=[!?.,])/gi, "")
-    .replace(MARCADOR_NOME, "")
-    .replace(/^[ \t]*,[ \t]*/gm, "")
+  const limpo = texto
+    .replace(/,?[ \t]*\[(?:primeiro\s+)?nome\]/gi, "")   // "Oiii, [nome]!" vira "Oiii!"
+    .replace(/^[ \t]*,[ \t]*/gm, "")                      // "[Nome], eu ouvi" vira "eu ouvi"
     .replace(/[ \t]{2,}/g, " ")
     .trim();
+  return limpo.charAt(0).toUpperCase() + limpo.slice(1);
 }
 
 // ---------- Gemini ----------
@@ -131,22 +156,25 @@ async function chamarGemini(sistema: string, pedido: string): Promise<string | n
   }
 }
 
-// Gera e salva UMA sugestão pra conversa. Roda em segundo plano depois que
-// a mensagem da cliente chega. mensagemId = a mensagem que disparou.
-export async function gerarSugestao(conversa: Conversa, mensagemId: string) {
-  // Espera um pouco: se ela mandar outra mensagem nesse meio-tempo, só a última gera sugestão
+// Gera e salva UMA sugestão pra conversa. Devolve o texto (ou null).
+// mensagemId = a mensagem que disparou (webhook): espera uns segundos e só
+// segue se ela ainda for a última. Sem mensagemId (pedido do painel): na hora.
+export async function gerarSugestao(conversa: Conversa, mensagemId: string | null): Promise<string | null> {
   console.log("[sugestão] começando, conversa", conversa.id);
-  await new Promise((r) => setTimeout(r, ESPERA_AGRUPAR_MS));
-  const { data: ultima } = await db.from("mensagens").select("id")
-    .eq("conversa_id", conversa.id).order("criada_em", { ascending: false }).limit(1).maybeSingle();
-  if (ultima?.id !== mensagemId) { console.log("[sugestão] pulada: chegou mensagem mais nova na conversa"); return; }
+  if (mensagemId) {
+    // Se ela mandar outra mensagem nesse meio-tempo, só a última gera sugestão
+    await new Promise((r) => setTimeout(r, ESPERA_AGRUPAR_MS));
+    const { data: ultima } = await db.from("mensagens").select("id")
+      .eq("conversa_id", conversa.id).order("criada_em", { ascending: false }).limit(1).maybeSingle();
+    if (ultima?.id !== mensagemId) { console.log("[sugestão] pulada: chegou mensagem mais nova na conversa"); return null; }
+  }
 
   const [{ data: msgs }, { data: roteiro }] = await Promise.all([
     db.from("mensagens").select("autor, texto").eq("conversa_id", conversa.id)
       .order("criada_em", { ascending: false }).limit(HISTORICO),
     db.from("abordagem").select("texto").eq("conta_id", conversa.conta_id).maybeSingle(),
   ]);
-  if (!msgs?.length) return;
+  if (!msgs?.length) return null;
 
   const historico = [...msgs].reverse()
     .map((m) => `${m.autor === "cliente" ? "Cliente" : "Atendente"}: ${anonimizar(m.texto, conversa)}`)
@@ -169,11 +197,12 @@ export async function gerarSugestao(conversa: Conversa, mensagemId: string) {
   const pedido = `Conversa até agora (da mais antiga para a mais recente):\n\n${historico}\n\nEscreva a próxima mensagem da Atendente.`;
 
   const bruta = await chamarGemini(sistema, pedido);
-  if (!bruta) return;
+  if (!bruta) return null;
   const sugestao = colocarNome(bruta, conversa.nome);
   const { error } = await db.from("sugestoes").insert({
     conversa_id: conversa.id, conta_id: conversa.conta_id, texto_sugerido: sugestao,
   });
-  if (error) console.error("[sugestão] não gravou:", error.message);
-  else console.log("[sugestão] salva (modelo", GEMINI_MODEL + ")");
+  if (error) { console.error("[sugestão] não gravou:", error.message); return null; }
+  console.log("[sugestão] salva (modelo", GEMINI_MODEL + ")");
+  return sugestao;
 }

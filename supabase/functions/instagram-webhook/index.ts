@@ -10,10 +10,10 @@
 // Precisa ser PÚBLICA: publique com --no-verify-jwt.
 // =====================================================================
 import {
-  Automation, completarPerfil, Conta, contaPorIgId, db, deliverAutomation, ehDaConta, ENV, findStep, json,
+  Automation, completarPerfil, Conta, contaPorIgId, db, deliverAutomation, ehDaConta, ENV, findStep, graphGet, json,
   keywordMatches, logDelivery, parsePayload, registrarInteracao, replyToComment, sendStep, upsertLead,
 } from "../_shared/ig.ts";
-import { conversaDe, gerarSugestao, gravarMensagem, textoDoEvento } from "../_shared/conversas.ts";
+import { conversaDe, gerarSugestao, gravarMensagem, midiaDoEvento, textoDoEvento } from "../_shared/conversas.ts";
 
 // Roda depois de responder 200 pro Meta (a sugestão demora alguns segundos)
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
@@ -70,6 +70,15 @@ async function receivedToday(conta: Conta, igUserId: string): Promise<boolean> {
   return (count ?? 0) > 0;
 }
 
+// Relatório: a conta respondeu o comentário de alguém (1 por pessoa por dia)
+async function contarRespostaComentario(conta: Conta, parentId: string) {
+  const r = await graphGet(conta.token, `/${parentId}`, { fields: "from" });
+  const autor: string | undefined = r.ok ? r.data?.from?.id : undefined;
+  if (!autor || ehDaConta(conta, autor)) return;
+  const { error } = await db.rpc("registrar_atendimento", { p_conta: conta.id, p_user: autor, p_canal: "comentario" });
+  if (error) console.warn("[relatório] não contou a resposta (rodou o 12_midias_relatorio.sql?):", error.message);
+}
+
 // =====================================================================
 // COMENTÁRIO
 // =====================================================================
@@ -84,8 +93,12 @@ async function handleComment(conta: Conta, value: any) {
   // 1) duplicado?
   if (!(await firstTime(`comment:${commentId}`))) return;
 
-  // 2) comentário da própria conta? ignora
-  if (ehDaConta(conta, fromId)) return;
+  // 2) comentário da própria conta: não dispara automação. Se for resposta
+  //    a alguém (automação ou alguém do time), conta no relatório.
+  if (ehDaConta(conta, fromId)) {
+    if (value?.parent_id) await contarRespostaComentario(conta, String(value.parent_id));
+    return;
+  }
 
   // 3) acha a automação da conta
   const found = await findAutomation(conta, text, mediaId);
@@ -138,7 +151,7 @@ async function handleMessage(conta: Conta, ev: any) {
     if (clienteId && texto && !ehDaConta(conta, clienteId)) {
       try {
         const conversa = await conversaDe(conta, clienteId);
-        if (conversa) await gravarMensagem(conversa, "eu", texto, msg?.mid ?? null, quando);
+        if (conversa) await gravarMensagem(conversa, "eu", texto, msg?.mid ?? null, quando, midiaDoEvento(msg));
       } catch (e) { console.error("[caixa de entrada] eco não gravado:", e); }
     }
     return;
@@ -160,7 +173,7 @@ async function handleMessage(conta: Conta, ev: any) {
   if (textoConversa) {
     try {
       const conversa = await conversaDe(conta, senderId);
-      const novaId = conversa ? await gravarMensagem(conversa, "cliente", textoConversa, mid ?? null, quando) : null;
+      const novaId = conversa ? await gravarMensagem(conversa, "cliente", textoConversa, mid ?? null, quando, midiaDoEvento(msg)) : null;
       const tocouBotao = !!(postback || msg?.quick_reply);
       if (conversa && novaId && msg?.text && !tocouBotao) emSegundoPlano(gerarSugestao(conversa, novaId));
     } catch (e) { console.error("[caixa de entrada] mensagem não gravada:", e); }

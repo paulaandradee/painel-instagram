@@ -303,3 +303,38 @@ Como funciona:
 > enviado pra melhorar os produtos dele. Por isso os dados pessoais são trocados antes de
 > sair. Mesmo assim, não cole dados sensíveis no roteiro. Se precisar de garantia de que
 > nada é usado, ative o faturamento no projeto do Google (plano pago).
+
+### Anexos, relatório e repescagem do Direct
+
+Rode `supabase/sql/12_midias_relatorio.sql` no SQL Editor **antes** de publicar as funções
+(ele cria as colunas de mídia, a pasta `midias` no Storage e a contagem de atendimentos).
+Depois publique:
+
+```bash
+supabase functions deploy instagram-webhook --no-verify-jwt
+supabase functions deploy enviar-resposta
+supabase functions deploy conversas-acoes
+```
+
+**Anexos (aba Conversas):** 📎 imagem (PNG, JPG, GIF, até 8 MB), vídeo, áudio (M4A, AAC,
+WAV) ou PDF (até 25 MB); 🎤 grava áudio no navegador (vira WAV, até 5 min); 🧡 manda o
+coração laranja da marca, sozinho (aparece grande no Direct). Figurinhas não vão pela API:
+a única que existe é o coração vermelho do Instagram. Também dá para colar uma
+imagem com Ctrl+V na caixa de texto. O arquivo fica na pasta pública `midias` do Storage
+(o Instagram precisa de um link público para entregar), com nome aleatório.
+
+**Relatório (aba Relatório):** atendimentos por dia, semana (domingo a sábado), mês e ano.
+Cada pessoa conta 1 vez por dia em cada canal; respondida no comentário e no Direct no
+mesmo dia conta 2. Entram as automações, o painel, as respostas pelo celular e as respostas
+escritas à mão nos comentários. O dia é o de Brasília. O histórico das automações (tabela
+`ig_deliveries`) já entra na conta.
+
+**Repescar (aba Conversas):** traz as conversas do Direct dos últimos 7 dias em que a última
+mensagem é da cliente. A API não informa se a mensagem foi lida nem a pasta (Principal ou
+Geral), então entram todas as sem resposta. Cada uma ganha sugestão ao ser aberta.
+
+**Responder depois de 24h (até 7 dias):** o envio usa a etiqueta `HUMAN_AGENT`, que exige a
+permissão **Human Agent** no app. No Meta for Developers: **App Review > Permissions and
+Features**, procure **Human Agent**, clique em **Request** e descreva o uso (uma pessoa do time
+responde manualmente pelo painel, cada mensagem revisada antes de sair). Enquanto não for
+aprovada, o painel avisa ao tentar responder conversas com mais de 24h.

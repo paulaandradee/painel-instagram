@@ -528,12 +528,41 @@ details.avancado .grade2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8
   .celular { height: 540px; }
 }
 
+/* ---------- Relatório de atendimentos ---------- */
+.rel-nav { gap: 4px; }
+.rel-nav .btn-icone { font-size: 20px; line-height: 1; }
+.rel-titulo { min-width: 150px; text-align: center; text-transform: capitalize; }
+.rel-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.rel-tabela { min-width: 0; }
+.rel-tabela th.num, .rel-tabela td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.rel-tabela tfoot td { font-weight: 700; border-top: 2px solid var(--borda); padding: 10px 12px; }
+.rel-tabela tr.rel-zero td { color: var(--texto-3); }
+@media (max-width: 600px) { .rel-kpis { grid-template-columns: 1fr; } }
+
 /* ---------- Conversas (caixa de entrada com sugestão da IA) ---------- */
 .cx { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; height: calc(100vh - 230px); min-height: 480px; }
 .cx-lista, .cx-chat { padding: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .cx-lista-topo { display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid var(--borda); }
 .cx-lista-topo .input { flex: 1; min-width: 0; }
-.cx-filtro { margin: 10px 12px 4px; align-self: flex-start; }
+.cx-filtro-linha { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 12px 4px; }
+.cx-acoes { display: flex; align-items: center; gap: 8px; }
+.cx-ferramentas { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.cx-ferramentas .btn-icone { font-size: 16px; }
+.cx-midia { display: block; max-width: 260px; max-height: 320px; border-radius: 10px; margin-bottom: 4px; }
+.cx-audio { display: block; width: 240px; max-width: 100%; margin-bottom: 4px; }
+.cx-coracao { font-size: 34px; line-height: 1; }
+.cx-rotulo-midia { display: none; }
+.cx-rotulo-midia.visivel { display: inline; }
+.cx-anexo-chip {
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--borda);
+  border-radius: var(--raio-p); background: var(--superficie-2); font-size: 13px;
+}
+.cx-anexo-chip img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; }
+.cx-anexo-chip audio { height: 32px; max-width: 220px; }
+.cx-anexo-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-anexo-chip.gravando { color: var(--erro); font-weight: 600; }
+.cx-rec { width: 10px; height: 10px; border-radius: 50%; background: var(--erro); animation: cx-pisca 1s infinite; }
+@keyframes cx-pisca { 50% { opacity: .25; } }
 .cx-itens { overflow-y: auto; flex: 1; padding: 6px; }
 .cx-item {
   display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border: 0; border-radius: var(--raio-p);

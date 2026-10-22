@@ -32,3 +32,7 @@ verify_jwt = true
 # Envia a resposta revisada: chamada pelo painel (pessoa logada)
 [functions.enviar-resposta]
 verify_jwt = true
+
+# Sugestão na hora e repescagem do Direct: chamada pelo painel (pessoa logada)
+[functions.conversas-acoes]
+verify_jwt = true
