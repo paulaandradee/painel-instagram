@@ -226,7 +226,8 @@
     const caixa = $("#cx-texto");
     const aviso = $("#cx-sug-aviso");
     if (!caixa || !aviso) return;
-    if (sugestao && (forcar || !editado)) {
+    // Caixa vazia nunca conta como "editada": a sugestão entra
+    if (sugestao && (forcar || !editado || !caixa.value.trim())) {
       caixa.value = sugestao.texto_sugerido;
       editado = false;
     }
@@ -404,7 +405,8 @@
   raiz.addEventListener("input", (e) => {
     if (e.target.id === "cx-busca") { busca = e.target.value; renderLista(); }
     if (e.target.id === "cx-texto") {
-      editado = !sugestao || e.target.value !== sugestao.texto_sugerido;
+      const v = e.target.value;
+      editado = v.trim() !== "" && (!sugestao || v !== sugestao.texto_sugerido);
       preencherSugestao();
     }
   });
