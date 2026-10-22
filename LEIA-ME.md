@@ -338,3 +338,15 @@ permissão **Human Agent** no app. No Meta for Developers: **App Review > Permis
 Features**, procure **Human Agent**, clique em **Request** e descreva o uso (uma pessoa do time
 responde manualmente pelo painel, cada mensagem revisada antes de sair). Enquanto não for
 aprovada, o painel avisa ao tentar responder conversas com mais de 24h.
+
+### Calendário de conteúdo
+
+Rode `supabase/sql/13_calendario.sql` no SQL Editor. O menu **Calendário** passa a mostrar o
+mês (domingo a sábado) com os conteúdos planejados de cada conta: data (opcional, sem data =
+ideia guardada), formato, tema, legenda (até 2.200 caracteres), observações, status (a fazer,
+pronto, publicado) e as etapas gravar, editar, legenda e publicado.
+
+- As etapas puxam o status: gravar + editar + legenda = **Pronto**; publicado = **Publicado**.
+  Dá para trocar o status na mão (ex.: carrossel sem gravação).
+- Arraste um conteúdo para outro dia para mudar a data, ou para "Ideias sem data" para tirar a data.
+- Quem tem acesso à conta vê e edita; a tela se atualiza sozinha a cada 30 segundos.

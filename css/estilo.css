@@ -528,6 +528,69 @@ details.avancado .grade2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8
   .celular { height: 540px; }
 }
 
+/* ---------- Calendário de conteúdo ---------- */
+.cal-topo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.cal-topo > .btn-primario { margin-left: auto; }
+.cal-nav { gap: 4px; }
+.cal-nav .btn-icone { font-size: 20px; line-height: 1; }
+.cal-titulo { min-width: 150px; text-align: center; text-transform: capitalize; font-size: 16px; }
+.cal-resumo { margin: 0 0 12px; }
+.cal-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+.cal-mes { padding: 0; overflow: hidden; }
+.cal-grade { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cal-semana {
+  padding: 8px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--texto-2); border-bottom: 1px solid var(--borda); text-align: center;
+}
+.cal-dia { min-height: 118px; padding: 6px; border-right: 1px solid var(--borda); border-bottom: 1px solid var(--borda); cursor: pointer; min-width: 0; }
+.cal-dia:nth-child(7n) { border-right: 0; }
+.cal-dia:hover { background: var(--fundo); }
+.cal-dia.fora { background: var(--superficie-2); }
+.cal-dia.fora .cal-num { color: var(--texto-3); }
+.cal-dia-topo { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.cal-num { font-size: 12.5px; font-weight: 600; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; }
+.cal-dia.hoje .cal-num { background: var(--destaque); color: #fff; }
+.cal-mais {
+  border: 0; background: none; color: var(--texto-3); font-size: 16px; line-height: 1; width: 22px; height: 22px;
+  border-radius: 6px; cursor: pointer; opacity: 0;
+}
+.cal-dia:hover .cal-mais, .cal-mais:focus-visible { opacity: 1; }
+.cal-mais:hover { background: var(--superficie-2); color: var(--destaque); }
+.cal-itens { display: flex; flex-direction: column; gap: 4px; }
+.cal-card {
+  display: flex; flex-direction: column; gap: 1px; width: 100%; text-align: left; padding: 5px 7px; cursor: grab;
+  border: 1px solid var(--borda); border-left: 3px solid var(--texto-3); border-radius: 6px; background: var(--superficie);
+  font-size: 12px; line-height: 1.3;
+}
+.cal-card:hover { box-shadow: var(--sombra); }
+.cal-card.st-pronto { border-left-color: var(--atencao); }
+.cal-card.st-publicado { border-left-color: var(--sucesso); }
+.cal-card.st-publicado .cal-card-tema { color: var(--texto-2); }
+.cal-card.arrastando { opacity: .4; }
+.cal-card-tema { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-card-meta { font-size: 11px; color: var(--texto-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-dia.soltar-aqui, .cal-ideias.soltar-aqui { background: var(--destaque-suave); outline: 2px dashed var(--destaque); outline-offset: -3px; }
+.cal-ideias { position: sticky; top: 16px; }
+.cal-agenda { display: none; padding: 12px; }
+.cal-agenda-dia { padding: 8px 0; border-bottom: 1px solid var(--borda); }
+.cal-agenda-dia:last-child { border-bottom: 0; }
+.cal-agenda-data { font-size: 12px; font-weight: 700; text-transform: capitalize; margin-bottom: 6px; color: var(--texto-2); }
+.cal-agenda-dia.hoje .cal-agenda-data { color: var(--destaque); }
+.cal-form-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 12px; }
+.cal-etapas { display: flex; gap: 8px; flex-wrap: wrap; }
+.cal-etapa {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--borda);
+  border-radius: 999px; cursor: pointer; font-size: 13.5px; user-select: none;
+}
+.cal-etapa:has(input:checked) { background: var(--destaque-suave); border-color: var(--destaque); color: var(--destaque-forte); font-weight: 600; }
+.cal-etapa input { accent-color: var(--destaque); }
+@media (max-width: 1100px) { .cal-layout { grid-template-columns: 1fr; } .cal-ideias { position: static; } }
+@media (max-width: 760px) {
+  .cal-grade { display: none; }
+  .cal-agenda { display: block; }
+  .cal-topo > .btn-primario { margin-left: 0; }
+}
+
 /* ---------- Relatório de atendimentos ---------- */
 .rel-nav { gap: 4px; }
 .rel-nav .btn-icone { font-size: 20px; line-height: 1; }

@@ -452,6 +452,7 @@ function navegar() {
   $$(".menu-item[data-rota]").forEach((m) => m.classList.toggle("ativo", m.dataset.rota === valida));
   $("#lateral").classList.remove("aberta");
   if (valida === "inicio") carregarInicio();
+  if (valida === "calendario") window.Calendario.carregar(); else window.Calendario?.parar();
   if (valida === "instagram" && App.conta) { trocarAba(abaInstagram); carregarStatusIg(); }
   if (valida === "acessos") window.Acessos.carregar();
 }
