@@ -286,7 +286,9 @@ Como funciona:
 3. **Segredos:**
    ```bash
    supabase secrets set GEMINI_API_KEY=SEU_VALOR_AQUI
-   # opcional: troca o modelo (padrão: gemini-flash-latest, o Flash mais novo)
+   # opcional: força um modelo na frente. Sem isso, a fila é montada sozinha:
+   # Flash > Flash-Lite > Gemma (o plano gratuito do Flash dá poucas dezenas por dia;
+   # quando um modelo estoura a cota, a sugestão sai pelo próximo)
    supabase secrets set GEMINI_MODEL=gemini-flash-latest
    ```
 4. **Funções:**
