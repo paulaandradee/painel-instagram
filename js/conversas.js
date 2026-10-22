@@ -9,6 +9,7 @@
 (function () {
   const JANELA_MS = 24 * 3600 * 1000;
   const TEXTO_MAX = 1000;
+  const VIGIA_MS = 10e3;  // de quanto em quanto tempo confere mensagens e sugestões novas
 
   let conversas = [];
   let atual = null;       // conversa aberta
@@ -19,7 +20,7 @@
   let busca = "";
   let canal = null;       // assinatura do Realtime
   let esperaLista = null;
-  let relogio = null;     // atualiza o aviso da janela de 24h
+  let relogio = null;     // a vigia: confere novidades e atualiza o aviso da janela de 24h
 
   const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const nomeDe = (c) => c.nome || (c.username ? `@${c.username}` : "Sem nome");
@@ -107,7 +108,29 @@
     // Reabre a conversa que estava aberta (ex: voltou de outra aba)
     if (atual) { const c = conversas.find((x) => x.id === atual.id); if (c) abrir(c.id); else { atual = null; renderChat(); } }
     clearInterval(relogio);
-    relogio = setInterval(renderJanela, 60e3);
+    relogio = setInterval(vigiar, VIGIA_MS);
+  }
+
+  // Reserva do tempo real: confere sozinho de tempos em tempos. Se o
+  // Realtime cair (ou estiver desligado no projeto), a tela segue em dia.
+  let ciclos = 0;
+  async function vigiar() {
+    if (document.hidden) return;
+    ciclos++;
+    if (ciclos % 6 === 0) renderJanela();
+    await carregarLista();
+    if (!atual) return;
+    const id = atual.id;
+    try {
+      const [m, s] = await Promise.all([lerMensagens(id), lerSugestao(id)]);
+      if (atual?.id !== id) return;
+      if (m.length !== msgs.length || m[m.length - 1]?.id !== msgs[msgs.length - 1]?.id) {
+        msgs = m;
+        renderMensagens();
+        renderJanela();
+      }
+      if (s && s.id !== sugestao?.id) { sugestao = s; preencherSugestao(); }
+    } catch { /* tenta de novo no próximo ciclo */ }
   }
 
   async function carregarLista() {
@@ -346,7 +369,9 @@
         sugestao = s;
         preencherSugestao();
       })
-      .subscribe();
+      .subscribe((status, erro) => {
+        if (status !== "SUBSCRIBED") console.warn("[conversas] tempo real:", status, erro ?? "", "(a vigia de 10s cobre)");
+      });
   }
 
   function parar() {
