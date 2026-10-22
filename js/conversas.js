@@ -230,6 +230,7 @@
         </div>
         <span id="cx-janela"></span>
         <button class="btn btn-p" data-acao="${c.status === "arquivada" ? "desarquivar" : "arquivar"}">${c.status === "arquivada" ? "Desarquivar" : "Arquivar"}</button>
+        ${c.status === "arquivada" ? `<button class="btn btn-p btn-fantasma btn-perigo" data-acao="excluir" title="Excluir esta conversa do painel"><span data-icone="lixo"></span> Excluir</button>` : ""}
       </div>
       <div class="cx-msgs" id="cx-msgs"></div>
       <div class="cx-resposta">
@@ -559,6 +560,24 @@
     carregarLista();
   }
 
+  // Só conversas arquivadas. Some do painel; no Instagram continua.
+  async function excluirConversa() {
+    if (!atual || atual.status !== "arquivada") return;
+    const ok = await confirmar(
+      "Excluir esta conversa?",
+      `A conversa com ${nomeDe(atual)} e as mensagens dela saem do painel para todo o time. No Instagram ela continua, e o Relatório não muda. Se a pessoa escrever de novo, a conversa volta do zero.`,
+      "Excluir", true,
+    );
+    if (!ok) return;
+    const { error, count } = await sb.from("conversas").delete({ count: "exact" }).eq("id", atual.id).eq("status", "arquivada");
+    if (error || !count) return aviso(error ? "Não foi possível excluir agora." : "Não foi possível excluir. Rodou o 14_excluir_conversas.sql?", "erro");
+    pedidas.delete(atual.id);
+    aviso("Conversa excluída.");
+    atual = null; msgs = []; sugestao = null;
+    renderChat();
+    carregarLista();
+  }
+
   // ---------------- Repescagem do Direct ----------------
   function abrirRepescagem() {
     const fundo = document.createElement("div");
@@ -705,6 +724,7 @@
     if (acao === "voltar") { atual = null; renderChat(); renderLista(); return; }
     if (acao === "arquivar") return mudarStatus("arquivada");
     if (acao === "desarquivar") return mudarStatus("respondida");
+    if (acao === "excluir") return excluirConversa();
     if (acao === "roteiro") return abrirRoteiro();
     if (acao === "repescar") return abrirRepescagem();
     if (acao === "abertas" || acao === "arquivadas") {

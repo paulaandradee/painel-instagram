@@ -350,3 +350,7 @@ pronto, publicado) e as etapas gravar, editar, legenda e publicado.
   Dá para trocar o status na mão (ex.: carrossel sem gravação).
 - Arraste um conteúdo para outro dia para mudar a data, ou para "Ideias sem data" para tirar a data.
 - Quem tem acesso à conta vê e edita; a tela se atualiza sozinha a cada 30 segundos.
+
+### Excluir conversas
+
+Rode `supabase/sql/14_excluir_conversas.sql`. Conversas **arquivadas** ganham o botão **Excluir**: a conversa, as mensagens e as sugestões saem do painel. No Instagram ela continua, e o Relatório não muda. Se a pessoa escrever de novo, a conversa volta do zero.
