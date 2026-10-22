@@ -151,6 +151,11 @@ a { color: var(--destaque); }
 .menu-item:hover { background: var(--superficie-2); color: var(--texto); }
 .menu-item.ativo { background: var(--destaque-suave); color: var(--destaque); }
 .menu-item .externo { color: var(--texto-3); font-size: 12px; margin-left: 2px; }
+.menu-grupo {
+  display: block; margin: 16px 10px 4px; padding-top: 12px; border-top: 1px solid var(--borda);
+  font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--texto-3);
+}
+@media (min-width: 761px) { .app.recolhido .menu-grupo { font-size: 0; margin: 12px 6px 4px; padding-top: 8px; } }
 .rodape-lateral { border-top: 1px solid var(--borda); padding-top: 12px; }
 .usuario { font-size: 12.5px; color: var(--texto-2); padding: 0 10px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topo-mobile { display: none; }

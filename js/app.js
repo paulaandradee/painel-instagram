@@ -35,6 +35,8 @@ const ICONES = {
   arquivo: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/>',
   grade: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   baixar: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  crm: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 16v-3M11 16v-6M15 16v-4M19 16V8"/><path d="M3 8h18"/>',
+  notion: '<path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4M8 12h8M8 16h5"/>',
   repescar: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/>',
   jardim: '<path d="M12 21v-8"/><path d="M12 17c-2.6-.2-4-1.4-4.6-3.2M12 16c2.4-.2 3.8-1.2 4.4-2.8"/><path d="M6.5 4c0 5 1.2 9 5.5 9s5.5-4 5.5-9c-1.6.5-2.8 1.3-3.4 2.4C13.4 5 12.8 4 12 3.2 11.2 4 10.6 5 10 6.4 9.4 5.3 8.1 4.5 6.5 4z"/>',
   pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
