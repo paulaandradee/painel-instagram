@@ -258,3 +258,48 @@ Toda automação guarda a conversa inteira no campo `flow` da tabela `ig_automat
 
 **No `supabase/config.toml`:**
 - [ ] `project_id` (ou só rode `supabase link`)
+
+---
+
+## Caixa de entrada com sugestão de resposta (IA)
+
+A aba **💬 Conversas** mostra o direct de cada conta. Quando a cliente escreve, a IA
+(Gemini Flash) deixa **uma sugestão** de resposta pronta na caixa de texto. **Nada sai
+sozinho:** a mensagem só é enviada quando alguém clica em **Enviar**.
+
+Como funciona:
+- O mesmo `instagram-webhook` grava cada mensagem na tabela `mensagens` (cria a conversa
+  se não existir) e, uns 4 segundos depois, pede a sugestão. Se ela mandar várias
+  mensagens seguidas, sai uma sugestão só, pra última.
+- A IA recebe as últimas 20 mensagens + o **roteiro** da conta (tabela `abordagem`).
+  Antes de enviar, nome e @ da cliente viram "Cliente", e e-mails e telefones viram
+  `[e-mail]` / `[telefone]`.
+- Tocar em botão de automação não gera sugestão (a automação já responde).
+- O que você responde pelo celular também entra no histórico (eco do Instagram).
+- `enviar-resposta` recusa o envio se passou de 24h da última mensagem da cliente.
+
+### Pra ligar
+
+1. **Banco:** rode `supabase/sql/11_conversas.sql` no SQL Editor (cria as tabelas, as
+   regras de acesso e liga o Realtime em `mensagens` e `sugestoes`).
+2. **Chave do Gemini:** em aistudio.google.com, **Get API key > Create API key**.
+3. **Segredos:**
+   ```bash
+   supabase secrets set GEMINI_API_KEY=SEU_VALOR_AQUI
+   # opcional: troca o modelo (padrão: gemini-flash-latest, o Flash mais novo)
+   supabase secrets set GEMINI_MODEL=gemini-flash-latest
+   ```
+4. **Funções:**
+   ```bash
+   supabase functions deploy instagram-webhook --no-verify-jwt
+   supabase functions deploy enviar-resposta
+   ```
+5. **Roteiro:** no painel, aba Conversas, botão **Roteiro**: cole o texto de atendimento
+   do time (um por conta).
+6. **Meta:** nada novo se o webhook já assina `messages`. Confira no Passo 7 e, no app do
+   Instagram, se "Permitir acesso às mensagens" está ligado (Passo 6, item 6).
+
+> **Privacidade:** no plano gratuito da API do Gemini, o Google pode usar o conteúdo
+> enviado pra melhorar os produtos dele. Por isso os dados pessoais são trocados antes de
+> sair. Mesmo assim, não cole dados sensíveis no roteiro. Se precisar de garantia de que
+> nada é usado, ative o faturamento no projeto do Google (plano pago).

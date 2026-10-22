@@ -481,9 +481,12 @@ function trocarAba(aba) {
   $("#aba-metricas").hidden = aba !== "metricas";
   $("#aba-automacoes").hidden = aba !== "automacoes";
   $("#aba-interacoes").hidden = aba !== "interacoes";
+  $("#aba-conversas").hidden = aba !== "conversas";
+  if (aba !== "conversas") window.Conversas?.parar(); // desliga o tempo real fora da aba
   if (aba === "metricas") window.Analises.carregar();
   if (aba === "automacoes") carregarAutomacoes();
   if (aba === "interacoes") window.Interacoes.carregar();
+  if (aba === "conversas") window.Conversas.carregar();
 }
 
 // =====================================================================

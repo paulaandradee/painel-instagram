@@ -1,2 +1,5 @@
 # não sobe arquivos temporários
 _*.html
+
+# arquivos internos da CLI do Supabase
+supabase/.temp/

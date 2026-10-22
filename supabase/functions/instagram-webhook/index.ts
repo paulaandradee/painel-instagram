@@ -2,7 +2,9 @@
 // instagram-webhook: o CÉREBRO
 // - GET: aperto de mão com o Meta (hub.challenge)
 // - POST: recebe comentários, mensagens, toques em botão (postback e
-//   quick_reply) e responde sozinho.
+//   quick_reply) e responde sozinho às AUTOMAÇÕES. Mensagens do direct
+//   também vão pra caixa de entrada (tabela mensagens) com uma sugestão
+//   da IA, que só sai quando alguém clicar em Enviar no painel.
 // Várias contas: cada evento diz qual conta recebeu (entry.id). O webhook
 // usa só as automações, os leads e o token DESSA conta.
 // Precisa ser PÚBLICA: publique com --no-verify-jwt.
@@ -11,6 +13,14 @@ import {
   Automation, completarPerfil, Conta, contaPorIgId, db, deliverAutomation, ehDaConta, ENV, findStep, json,
   keywordMatches, logDelivery, parsePayload, registrarInteracao, replyToComment, sendStep, upsertLead,
 } from "../_shared/ig.ts";
+import { conversaDe, gerarSugestao, gravarMensagem, textoDoEvento } from "../_shared/conversas.ts";
+
+// Roda depois de responder 200 pro Meta (a sugestão demora alguns segundos)
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
+function emSegundoPlano(p: Promise<unknown>) {
+  const seguro = p.catch((e) => console.error("[segundo plano] erro:", e));
+  if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(seguro);
+}
 
 // ---------- Assinatura do Meta (HMAC SHA-256 com o APP_SECRET) ----------
 async function signatureOk(req: Request, raw: string): Promise<boolean> {
@@ -118,8 +128,21 @@ async function handleMessage(conta: Conta, ev: any) {
   const msg = ev?.message;
   const postback = ev?.postback;
 
-  // Echo = mensagem que a própria conta mandou (bot ou você na mão). Ignora.
-  if (msg?.is_echo) return;
+  const quando = ev?.timestamp ? new Date(Number(ev.timestamp)) : new Date();
+
+  // Echo = mensagem que a própria conta mandou (bot, painel ou você no celular).
+  // Não dispara automação; só entra no histórico da conversa como "eu".
+  if (msg?.is_echo) {
+    const clienteId: string | undefined = ev?.recipient?.id;
+    const texto = textoDoEvento(msg, null);
+    if (clienteId && texto && !ehDaConta(conta, clienteId)) {
+      try {
+        const conversa = await conversaDe(conta, clienteId);
+        if (conversa) await gravarMensagem(conversa, "eu", texto, msg?.mid ?? null, quando);
+      } catch (e) { console.error("[caixa de entrada] eco não gravado:", e); }
+    }
+    return;
+  }
   if (!senderId || ehDaConta(conta, senderId)) return;
 
   const mid: string | undefined = msg?.mid ?? postback?.mid;
@@ -128,6 +151,19 @@ async function handleMessage(conta: Conta, ev: any) {
     const { data: own } = await db.from("ig_bot_sends").select("mid").eq("mid", mid).maybeSingle();
     if (own) return;
     if (!(await firstTime(`msg:${mid}`))) return;
+  }
+
+  // Caixa de entrada: salva a mensagem e, se for texto escrito (não toque
+  // em botão), pede uma SUGESTÃO de resposta. Nada é enviado sozinho.
+  // Uma falha aqui nunca pode travar as automações logo abaixo.
+  const textoConversa = textoDoEvento(msg, postback);
+  if (textoConversa) {
+    try {
+      const conversa = await conversaDe(conta, senderId);
+      const novaId = conversa ? await gravarMensagem(conversa, "cliente", textoConversa, mid ?? null, quando) : null;
+      const tocouBotao = !!(postback || msg?.quick_reply);
+      if (conversa && novaId && msg?.text && !tocouBotao) emSegundoPlano(gerarSugestao(conversa, novaId));
+    } catch (e) { console.error("[caixa de entrada] mensagem não gravada:", e); }
   }
 
   const source = msg?.reply_to?.story ? "story_reply" : "dm";
