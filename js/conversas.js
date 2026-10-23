@@ -6,7 +6,6 @@
 // - anexos: imagem, vídeo, PDF, áudio (arquivo ou gravado aqui) e o 🧡
 // - atualiza em tempo real (Realtime) e, de reserva, confere a cada 10s
 // - "Roteiro": o texto de atendimento que a IA segue (tabela abordagem)
-// - "Repescar": traz as conversas do Direct sem resposta dos últimos 7 dias
 // =====================================================================
 (function () {
   const HORA_MS = 3600 * 1000;
@@ -53,13 +52,6 @@
     if (d.toDateString() === hoje.toDateString()) return hora(iso);
     if (Date.now() - d.getTime() < 7 * 864e5) return d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "");
     return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-  }
-  function haQuanto(iso) {
-    const h = Math.floor((Date.now() - new Date(iso).getTime()) / HORA_MS);
-    if (h < 1) return "agora há pouco";
-    if (h < 24) return `há ${h} h`;
-    const d = Math.floor(h / 24);
-    return d === 1 ? "ontem" : `há ${d} dias`;
   }
 
   // Quanto tempo passou desde a última mensagem da cliente (ms). Infinity = nunca escreveu.
@@ -135,7 +127,6 @@
               <button class="${verArquivadas ? "" : "ativo"}" data-acao="abertas" aria-pressed="${!verArquivadas}">Abertas</button>
               <button class="${verArquivadas ? "ativo" : ""}" data-acao="arquivadas" aria-pressed="${verArquivadas}">Arquivadas</button>
             </div>
-            <button class="btn btn-p" data-acao="repescar" title="Trazer as conversas do Direct sem resposta dos últimos 7 dias"><span data-icone="repescar"></span> Repescar</button>
           </div>
           <div class="cx-itens" id="cx-itens"><div class="texto-2 pequeno" style="padding:14px">Carregando...</div></div>
         </div>
@@ -188,7 +179,7 @@
     const lista = t ? conversas.filter((c) => norm(`${c.nome} ${c.username}`).includes(t)) : conversas;
     if (!lista.length) {
       alvo.innerHTML = `<div class="texto-2 pequeno" style="padding:18px; text-align:center">${
-        conversas.length ? "Nenhuma conversa com essa busca." : verArquivadas ? "Nenhuma conversa arquivada." : "Quando alguém mandar mensagem no direct, a conversa aparece aqui. Para trazer as que já estavam sem resposta, use Repescar."}</div>`;
+        conversas.length ? "Nenhuma conversa com essa busca." : verArquivadas ? "Nenhuma conversa arquivada." : "Quando alguém mandar mensagem no direct, a conversa aparece aqui."}</div>`;
       return;
     }
     alvo.innerHTML = lista.map((c) => `
@@ -585,64 +576,6 @@
     carregarLista();
   }
 
-  // ---------------- Repescagem do Direct ----------------
-  function abrirRepescagem() {
-    const fundo = document.createElement("div");
-    fundo.className = "modal-fundo";
-    fundo.innerHTML = `<div class="cartao modal modal-largo" role="dialog" aria-modal="true" aria-labelledby="rd-titulo">
-      <div class="linha-entre" style="margin-bottom:6px">
-        <h3 class="subtitulo" id="rd-titulo">🔁 Repescar o Direct</h3>
-        <button class="btn btn-icone btn-fantasma" data-rd="fechar" aria-label="Fechar">✕</button>
-      </div>
-      <p class="pequeno texto-2" style="margin:0 0 14px">Conversas dos últimos 7 dias em que a última mensagem é da cliente (sem resposta). Elas vêm para a aba Conversas com sugestão da IA. Nada é enviado sem você clicar.</p>
-      <div id="rd-corpo"><div class="texto-2" style="padding:20px 0">Lendo as conversas do Instagram...</div></div>
-    </div>`;
-    const fechar = () => { fundo.remove(); document.removeEventListener("keydown", tecla); };
-    const tecla = (e) => { if (e.key === "Escape") fechar(); };
-    document.addEventListener("keydown", tecla);
-    fundo.addEventListener("click", (e) => { if (e.target === fundo || e.target.closest("[data-rd=fechar]")) fechar(); });
-    document.body.appendChild(fundo);
-    previaRepescagem(fundo, fechar);
-  }
-
-  async function previaRepescagem(fundo, fechar) {
-    const corpo = $("#rd-corpo", fundo);
-    const r = await invocar("conversas-acoes", { acao: "repescar", conta_id: App.conta.id, etapa: "previa" });
-    if (!r?.ok) {
-      corpo.innerHTML = `<div class="faixa faixa-erro">${icone("info")}<span>${esc(r?.erro || "Não foi possível ler as conversas agora.")}</span></div>
-        <div class="linha" style="justify-content:flex-end;margin-top:16px"><button class="btn" data-rd="fechar">Fechar</button></div>`;
-      return;
-    }
-    const n = r.total;
-    corpo.innerHTML = `
-      <div class="rp-numero"><div class="numero">${n.toLocaleString("pt-BR")}</div>
-        <span class="kpi-rotulo">${n === 1 ? "conversa sem resposta" : "conversas sem resposta"}</span></div>
-      <p class="pequeno texto-2" style="margin:8px 0 12px">Lidas ${r.resumo.lidas.toLocaleString("pt-BR")} conversas: ${r.resumo.respondidas.toLocaleString("pt-BR")} já respondidas${r.resumo.antigas ? `, ${r.resumo.antigas} com mais de 7 dias (não dá mais pra responder)` : ""}.</p>
-      <div class="faixa faixa-info" style="margin-bottom:12px">${icone("info")}<span>O Instagram não informa se a mensagem foi lida nem em qual pasta ela está (Principal ou Geral). Por isso entram todas as conversas sem resposta. As de 24h a 7 dias só podem ser respondidas com a permissão Human Agent.</span></div>
-      ${n ? `<span class="rotulo">Quem vai entrar</span>
-        <div class="rp-lista">${r.pessoas.map((p) => `
-          <div class="rp-pessoa"><span class="avatar" aria-hidden="true">${esc((p.username || "?").charAt(0).toUpperCase())}</span>
-            <div style="min-width:0"><div>${p.username ? `@${esc(p.username)}` : "sem @"}<span class="pequeno texto-2"> · ${esc(haQuanto(p.quando))}</span></div>
-              <div class="pequeno texto-2 rp-texto">"${esc(p.texto)}"</div></div></div>`).join("")}
-          ${n > r.pessoas.length ? `<p class="pequeno texto-2" style="margin:8px 0 0">e mais ${n - r.pessoas.length}...</p>` : ""}
-        </div>` : `<div class="faixa faixa-info">${icone("info")}<span>Nenhuma conversa sem resposta nos últimos 7 dias. 🎉</span></div>`}
-      <div class="linha" style="justify-content:flex-end;margin-top:18px">
-        <button class="btn" data-rd="fechar">Cancelar</button>
-        ${n ? `<button class="btn btn-primario" id="rd-trazer">Trazer ${n.toLocaleString("pt-BR")} ${n === 1 ? "conversa" : "conversas"}</button>` : ""}
-      </div>`;
-    pintarIcones(corpo);
-    const btn = $("#rd-trazer", corpo);
-    if (btn) btn.onclick = async () => {
-      btn.disabled = true; btn.textContent = "Trazendo...";
-      const res = await invocar("conversas-acoes", { acao: "repescar", conta_id: App.conta.id, etapa: "trazer" });
-      if (!res?.ok) { btn.disabled = false; btn.textContent = "Tentar de novo"; return aviso(res?.erro || "Não foi possível trazer agora.", "erro"); }
-      fechar();
-      aviso(`${res.trazidas} ${res.trazidas === 1 ? "conversa trazida" : "conversas trazidas"}. Abra cada uma: a sugestão aparece na hora.${res.restantes ? ` Faltaram ${res.restantes}: clique em Repescar de novo.` : ""}`, "ok");
-      verArquivadas = false;
-      carregar();
-    };
-  }
-
   // ---------------- Roteiro (tabela abordagem) ----------------
   async function abrirRoteiro() {
     const { data } = await sb.from("abordagem").select("texto").eq("conta_id", App.conta.id).maybeSingle();
@@ -733,7 +666,6 @@
     if (acao === "desarquivar") return mudarStatus("respondida");
     if (acao === "excluir") return excluirConversa();
     if (acao === "roteiro") return abrirRoteiro();
-    if (acao === "repescar") return abrirRepescagem();
     if (acao === "abertas" || acao === "arquivadas") {
       verArquivadas = acao === "arquivadas";
       atual = null;

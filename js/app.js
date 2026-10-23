@@ -38,7 +38,6 @@ const ICONES = {
   crm: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 16v-3M11 16v-6M15 16v-4M19 16V8"/><path d="M3 8h18"/>',
   notion: '<path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4M8 12h8M8 16h5"/>',
   cadeado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
-  repescar: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/>',
   jardim: '<path d="M12 21v-8"/><path d="M12 17c-2.6-.2-4-1.4-4.6-3.2M12 16c2.4-.2 3.8-1.2 4.4-2.8"/><path d="M6.5 4c0 5 1.2 9 5.5 9s5.5-4 5.5-9c-1.6.5-2.8 1.3-3.4 2.4C13.4 5 12.8 4 12 3.2 11.2 4 10.6 5 10 6.4 9.4 5.3 8.1 4.5 6.5 4z"/>',
   pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
 };
@@ -227,18 +226,6 @@ const Dados = {
     if (!App.remoto) return null;
     const { data } = await sb.from("ig_contas").select("token_expira_em, token_ok").eq("id", App.conta.id).maybeSingle();
     return data ? { expires_at: data.token_expira_em, last_ok: data.token_ok } : null;
-  },
-
-  // Repescagem (função ig-repescagem). acao: "previa" ou "enviar". null = não conectado.
-  async repescagem(automationId, acao, responderPublico = false) {
-    if (!App.remoto) return null;
-    try {
-      const { data, error } = await sb.functions.invoke("ig-repescagem", {
-        body: { automation_id: automationId, acao, responder_publico: responderPublico },
-      });
-      if (error) return { ok: false, erro: "Não foi possível falar com o servidor agora." };
-      return data;
-    } catch { return { ok: false, erro: "Não foi possível falar com o servidor agora." }; }
   },
 
   // DMs entregues nas últimas 24h
@@ -572,7 +559,6 @@ async function carregarAutomacoes() {
         </div>
         <label class="switch" title="Ligar ou desligar"><input type="checkbox" data-acao="ligar" ${a.active ? "checked" : ""}><span class="trilho"></span></label>
         <span class="status ${a.active ? "on" : "off"}">${a.active ? "Ligada" : "Desligada"}</span>
-        <button class="btn btn-p" data-acao="repescar" title="Responder comentários dos últimos 7 dias que ficaram sem DM"><span data-icone="repescar"></span> Repescar</button>
         <button class="btn btn-p" data-acao="editar"><span data-icone="lapis"></span> Editar</button>
         <button class="btn btn-icone btn-fantasma btn-perigo" data-acao="apagar" aria-label="Apagar"><span data-icone="lixo"></span></button>
       </div>`;
@@ -603,7 +589,6 @@ $("#lista-automacoes").addEventListener("click", async (e) => {
   const auto = ($("#lista-automacoes")._lista || []).find((a) => a.id === id);
   if (!auto) return;
   if (btn.dataset.acao === "editar") window.Editor.abrir(auto);
-  if (btn.dataset.acao === "repescar") window.Repescagem.abrir(auto);
   if (btn.dataset.acao === "apagar") {
     const ok = await confirmar("Apagar automação?", `"${auto.nome || "Sem nome"}" vai parar de responder e não dá pra desfazer.`, "Apagar", true);
     if (!ok) return;

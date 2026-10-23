@@ -306,7 +306,7 @@ Como funciona:
 > sair. Mesmo assim, não cole dados sensíveis no roteiro. Se precisar de garantia de que
 > nada é usado, ative o faturamento no projeto do Google (plano pago).
 
-### Anexos, relatório e repescagem do Direct
+### Anexos e relatório
 
 Rode `supabase/sql/12_midias_relatorio.sql` no SQL Editor **antes** de publicar as funções
 (ele cria as colunas de mídia, a pasta `midias` no Storage e a contagem de atendimentos).
@@ -330,10 +330,6 @@ Cada pessoa conta 1 vez por dia em cada canal; respondida no comentário e no Di
 mesmo dia conta 2. Entram as automações, o painel, as respostas pelo celular e as respostas
 escritas à mão nos comentários. O dia é o de Brasília. O histórico das automações (tabela
 `ig_deliveries`) já entra na conta.
-
-**Repescar (aba Conversas):** traz as conversas do Direct dos últimos 7 dias em que a última
-mensagem é da cliente. A API não informa se a mensagem foi lida nem a pasta (Principal ou
-Geral), então entram todas as sem resposta. Cada uma ganha sugestão ao ser aberta.
 
 **Responder depois de 24h (até 7 dias):** o envio usa a etiqueta `HUMAN_AGENT`, que exige a
 permissão **Human Agent** no app. No Meta for Developers: **App Review > Permissions and

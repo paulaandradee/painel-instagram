@@ -498,13 +498,6 @@ details.avancado .grade2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8
 .ac-credenciais { background: var(--superficie-2); border-radius: var(--raio-p); padding: 12px 14px; margin: 0; white-space: pre-wrap; font-size: 13.5px; }
 .seletor-conta button { font-size: 13.5px; padding: 6px 14px; }
 
-/* ---------- Repescagem ---------- */
-.rp-numero .numero { color: var(--destaque); margin: 0; }
-.rp-lista { max-height: 260px; overflow-y: auto; border: 1px solid var(--borda); border-radius: var(--raio-p); padding: 4px 10px; }
-.rp-pessoa { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--borda); }
-.rp-pessoa:last-child { border-bottom: 0; }
-.rp-pessoa a { font-weight: 600; text-decoration: none; }
-.rp-texto { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- Mobile ---------- */
 @media (max-width: 900px) {
