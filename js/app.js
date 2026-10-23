@@ -28,6 +28,7 @@ const ICONES = {
   voltar: '<path d="M15 18l-6-6 6-6"/>',
   lixo: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   lapis: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  olho: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
   imagem: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
   grafico: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
@@ -101,6 +102,7 @@ const App = {
   contas: [],    // contas de Instagram que esta pessoa pode ver
   conta: null,   // a conta escolhida no momento
   admin: false,  // administradora: conecta contas e libera pessoas
+  leitor: false, // só visualização: vê tudo, não altera nada (quem barra é o banco)
 };
 
 // Filtra uma consulta pela conta, se houver
@@ -124,6 +126,12 @@ const Dados = {
   async souAdmin() {
     if (!App.remoto) return false;
     const { data } = await sb.from("painel_admins").select("user_id").eq("user_id", App.usuario.id).maybeSingle();
+    return !!data;
+  },
+
+  async souLeitor() {
+    if (!App.remoto) return false;
+    const { data } = await sb.from("painel_leitores").select("user_id").eq("user_id", App.usuario.id).maybeSingle();
     return !!data;
   },
 
@@ -383,13 +391,14 @@ function entrar(usuario) {
   prepararContas().then(navegar);
 }
 
-// Carrega as contas da pessoa, a conta escolhida e se ela é administradora
+// Carrega as contas da pessoa, a conta escolhida e se ela é administradora ou leitora
 async function prepararContas() {
-  try { [App.contas, App.admin] = await Promise.all([Dados.contas(), Dados.souAdmin()]); }
-  catch { App.contas = []; App.admin = false; }
+  try { [App.contas, App.admin, App.leitor] = await Promise.all([Dados.contas(), Dados.souAdmin(), Dados.souLeitor()]); }
+  catch { App.contas = []; App.admin = false; App.leitor = false; }
   const salva = memoria.ler("conta_atual", null);
   App.conta = App.contas.find((c) => c.id === salva) || App.contas[0] || null;
   $("#menu-acessos").hidden = !App.admin;
+  document.body.classList.toggle("leitor", App.leitor); // esconde os botões de alterar (.so-edicao)
   renderSeletorConta();
 }
 
@@ -533,8 +542,8 @@ async function carregarAutomacoes() {
       <div class="cartao vazio">
         <div class="vazio-icone" data-icone="chat"></div>
         <h2 class="subtitulo">Nenhuma automação ainda</h2>
-        <p>${falhou ? "Não foi possível ler o banco agora. Confira a configuração do Supabase." : "Crie a primeira: escolha uma palavra, escreva a mensagem e veja a prévia ao vivo."}</p>
-        <button class="btn btn-primario" data-acao="nova"><span data-icone="mais"></span> Nova automação</button>
+        <p>${falhou ? "Não foi possível ler o banco agora. Confira a configuração do Supabase." : App.leitor ? "Quando houver automações nesta conta, elas aparecem aqui." : "Crie a primeira: escolha uma palavra, escreva a mensagem e veja a prévia ao vivo."}</p>
+        <button class="btn btn-primario so-edicao" data-acao="nova"><span data-icone="mais"></span> Nova automação</button>
       </div>`;
     pintarIcones(alvo);
     return;
@@ -557,10 +566,10 @@ async function carregarAutomacoes() {
           <div class="chips">${palavras || '<span class="chip">Sem palavra</span>'}
             <span class="chip">${medias.length ? `${medias.length} post${medias.length > 1 ? "s" : ""}` : "Todos os posts"}</span></div>
         </div>
-        <label class="switch" title="Ligar ou desligar"><input type="checkbox" data-acao="ligar" ${a.active ? "checked" : ""}><span class="trilho"></span></label>
+        <label class="switch so-edicao" title="Ligar ou desligar"><input type="checkbox" data-acao="ligar" ${a.active ? "checked" : ""}><span class="trilho"></span></label>
         <span class="status ${a.active ? "on" : "off"}">${a.active ? "Ligada" : "Desligada"}</span>
-        <button class="btn btn-p" data-acao="editar"><span data-icone="lapis"></span> Editar</button>
-        <button class="btn btn-icone btn-fantasma btn-perigo" data-acao="apagar" aria-label="Apagar"><span data-icone="lixo"></span></button>
+        <button class="btn btn-p" data-acao="editar">${App.leitor ? `<span data-icone="olho"></span> Ver` : `<span data-icone="lapis"></span> Editar`}</button>
+        <button class="btn btn-icone btn-fantasma btn-perigo so-edicao" data-acao="apagar" aria-label="Apagar"><span data-icone="lixo"></span></button>
       </div>`;
   }).join("");
   pintarIcones(alvo);

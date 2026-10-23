@@ -69,14 +69,14 @@
           <div class="ac-linha" data-pessoa="${esc(p.id)}">
             <span class="avatar" aria-hidden="true">${esc((p.email || "?").charAt(0).toUpperCase())}</span>
             <div class="ac-info">
-              <div class="nome-l">${esc(p.email)} ${p.admin ? `<span class="chip chip-destaque">Administradora</span>` : ""}${p.id === App.usuario.id ? ` <span class="chip">você</span>` : ""}</div>
+              <div class="nome-l">${esc(p.email)} ${p.admin ? `<span class="chip chip-destaque">Administradora</span>` : p.leitor ? `<span class="chip">Só visualização</span>` : ""}${p.id === App.usuario.id ? ` <span class="chip">você</span>` : ""}</div>
               <div class="chips">${p.contas.length ? p.contas.map((id) => `<span class="chip">${esc(nomeConta(id))}</span>`).join("") : `<span class="pequeno texto-2">sem nenhuma conta liberada</span>`}</div>
             </div>
             <span class="pequeno texto-2">${p.ultimo_acesso ? "último acesso " + new Date(p.ultimo_acesso).toLocaleDateString("pt-BR") : "ainda não entrou"}</span>
             <button class="btn btn-p" data-ac="acessos">Acessos</button>
             ${!p.admin && p.id !== App.usuario.id ? `<button class="btn btn-icone btn-fantasma btn-perigo" data-ac="remover" aria-label="Remover ${esc(p.email)}">${icone("lixo")}</button>` : `<span style="width:32px"></span>`}
           </div>`).join("")}
-        <p class="ajuda" style="margin-bottom:0">Cada pessoa só vê, no Instagram do painel, as contas marcadas pra ela. Os atalhos do menu (Jardim, CRM, Notion) aparecem pra todas.</p>
+        <p class="ajuda" style="margin-bottom:0">Cada pessoa só vê, no Instagram do painel, as contas marcadas pra ela. Os atalhos do menu (Jardim, CRM, Notion) aparecem pra todas. Quem está em <b>Só visualização</b> vê tudo, mas não altera nada.</p>
       </div>`;
     pintarIcones(alvo);
   }
@@ -99,7 +99,12 @@
 
   const caixasContas = (marcadas = []) => estado.contas.map((c) => `
     <label class="ac-check"><input type="checkbox" value="${esc(c.id)}" ${marcadas.includes(c.id) ? "checked" : ""}> @${esc(c.username)} <span class="pequeno texto-2">${esc(c.nome || "")}</span></label>`).join("");
-  const marcadasEm = (el) => [...el.querySelectorAll(".ac-check input:checked")].map((i) => i.value);
+  const marcadasEm = (el) => [...el.querySelectorAll(".ac-checks .ac-check input:checked")].map((i) => i.value);
+
+  // Só visualização: vê tudo das contas marcadas, mas não altera nada
+  const caixaLeitor = (marcada = false) => `
+    <label class="ac-check" style="margin-top:12px"><input type="checkbox" id="ac-leitor" ${marcada ? "checked" : ""}>
+      <span><b>Só visualização</b><br><span class="pequeno texto-2">Vê automações, leads, conversas, relatório e calendário, mas não cria, edita, envia nem apaga nada.</span></span></label>`;
 
   function conectar() {
     janela("Conectar conta de Instagram", `
@@ -138,6 +143,7 @@
         <div class="ajuda">Pelo menos 8 caracteres. Você vai poder copiar e enviar pra ela no final.</div></div>
       <span class="rotulo">Contas que ela vê</span>
       <div class="ac-checks">${caixasContas()}</div>
+      ${caixaLeitor()}
       <div class="linha" style="justify-content:flex-end;margin-top:16px"><button class="btn" data-fechar>Cancelar</button><button class="btn btn-primario" id="ac-ok">Criar acesso</button></div>`,
     (el, fechar) => {
       $("#ac-gerar", el).onclick = () => { $("#ac-senha", el).value = senhaAleatoria(); };
@@ -146,7 +152,7 @@
         const email = $("#ac-email", el).value.trim(), senha = $("#ac-senha", el).value, contas = marcadasEm(el);
         if (!contas.length) return aviso("Marque pelo menos uma conta.", "atencao");
         btn.disabled = true; btn.textContent = "Criando...";
-        const r = await Dados.admin("criar_pessoa", { email, senha, contas });
+        const r = await Dados.admin("criar_pessoa", { email, senha, contas, leitor: $("#ac-leitor", el).checked });
         if (!r?.ok) { btn.disabled = false; btn.textContent = "Criar acesso"; return aviso(r?.erro || "Não foi possível criar.", "erro"); }
         // mostra os dados pra enviar
         const texto = `Seu acesso ao painel:\n${PAINEL_URL}\nE-mail: ${email}\nSenha: ${senha}`;
@@ -167,12 +173,13 @@
     janela(`Acessos de ${esc(pessoa.email)}`, `
       <p class="pequeno texto-2" style="margin:0 0 10px">Marque as contas de Instagram que ${pessoa.id === App.usuario.id ? "você vê" : "ela vê"} no painel.</p>
       <div class="ac-checks">${caixasContas(pessoa.contas)}</div>
+      ${pessoa.admin ? "" : caixaLeitor(pessoa.leitor)}
       <div class="linha" style="justify-content:flex-end;margin-top:16px"><button class="btn" data-fechar>Cancelar</button><button class="btn btn-primario" id="ac-ok">Salvar</button></div>`,
     (el, fechar) => {
       $("#ac-ok", el).onclick = async (e) => {
         const btn = e.currentTarget, contas = marcadasEm(el);
         btn.disabled = true;
-        const r = await Dados.admin("definir_acessos", { user_id: pessoa.id, contas });
+        const r = await Dados.admin("definir_acessos", { user_id: pessoa.id, contas, leitor: $("#ac-leitor", el)?.checked === true });
         if (!r?.ok) { btn.disabled = false; return aviso(r?.erro || "Não foi possível salvar.", "erro"); }
         fechar();
         aviso("Acessos salvos.", "ok");

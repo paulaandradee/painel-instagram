@@ -374,3 +374,13 @@ Rode `supabase/sql/17_analise_conversas.sql`. No **Relatório > Dia**, o botão 
 pede à IA um resumo do dia, as principais **dúvidas**, **objeções** e o **perfil/realidade dos
 leads**, a partir das conversas do Direct daquele dia (sem nomes nem dados pessoais). A análise
 fica guardada; só o botão gera outra (cada uma gasta 1 pedido da cota gratuita da IA).
+
+## Acesso só de visualização
+
+Rode `supabase/sql/18_somente_leitura.sql`. Em **Contas e acessos > Acessos** (ou ao adicionar
+uma pessoa), marque **Só visualização**: a pessoa vê tudo das contas liberadas pra ela
+(automações, leads, conversas, roteiro, relatório, análises, calendário e os atalhos do menu),
+mas não cria, edita, envia, arquiva nem apaga nada. Quem barra de verdade é o banco: as regras
+de gravar usam `contas_que_edito()`, que deixa de fora quem está em `painel_leitores`; as
+funções `enviar-resposta`, `conversas-acoes` e `ig-repescagem` também recusam. Administradora
+nunca fica só na visualização.

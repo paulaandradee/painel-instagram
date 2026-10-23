@@ -10,7 +10,7 @@
 // - Mídia: só arquivos da pasta "midias" desta conta (subidos pelo painel).
 // - Salva o que saiu com autor "eu".
 // =====================================================================
-import { contaDoUsuario, CORS, reply, requireUser } from "../_shared/painel.ts";
+import { contaDoUsuario, CORS, ehLeitor, reply, requireUser, SO_LEITURA } from "../_shared/painel.ts";
 import { db, ENV, graphPost, isAmbiguous } from "../_shared/ig.ts";
 import { Conversa, gravarMensagem, Midia } from "../_shared/conversas.ts";
 
@@ -28,6 +28,7 @@ Deno.serve(async (req) => {
 
   const userId = await requireUser(req);
   if (!userId) return reply({ ok: false, erro: "Faça login de novo." }, 401);
+  if (await ehLeitor(userId)) return reply({ ok: false, erro: SO_LEITURA }, 403);
 
   let body: any;
   try { body = await req.json(); } catch { return reply({ ok: false, erro: "Pedido inválido." }, 400); }

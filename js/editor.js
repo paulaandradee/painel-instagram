@@ -125,12 +125,16 @@
     foto = JSON.stringify(paraAutomacao());
     aberto = true;
     preencherCampos();
+    // leitora: abre só pra ver (nada clicável, sem Salvar)
+    $(".editor-grade").inert = App.leitor;
+    $("#ed-nome").readOnly = App.leitor;
+    $("#ed-ativa").disabled = App.leitor;
     $("#ed-erros").hidden = true;
     $("#ed-posts").innerHTML = "";
     $("#editor").hidden = false;
     $(".editor-corpo").scrollTop = 0;
     document.body.style.overflow = "hidden";
-    if (!automacao) setTimeout(() => $("#ed-nome").focus(), 50);
+    if (!automacao && !App.leitor) setTimeout(() => $("#ed-nome").focus(), 50);
   }
 
   async function fechar() {

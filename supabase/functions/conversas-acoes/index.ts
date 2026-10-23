@@ -13,7 +13,7 @@
 // A API não diz se a mensagem foi lida nem em qual pasta está
 // (Principal, Geral): "sem resposta" é o que dá para saber.
 // =====================================================================
-import { contaDoUsuario, CORS, reply, requireUser } from "../_shared/painel.ts";
+import { contaDoUsuario, CORS, ehLeitor, reply, requireUser, SO_LEITURA } from "../_shared/painel.ts";
 import { Conta, db, ehDaConta, graphGet } from "../_shared/ig.ts";
 import { analisarDia, Conversa, conversaDe, gerarSugestao, Midia, ultimaFalha } from "../_shared/conversas.ts";
 
@@ -115,6 +115,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return reply({ ok: false, erro: "use POST" }, 405);
   const userId = await requireUser(req);
   if (!userId) return reply({ ok: false, erro: "Faça login de novo." }, 401);
+  if (await ehLeitor(userId)) return reply({ ok: false, erro: SO_LEITURA }, 403);
 
   let corpo: any = {};
   try { corpo = await req.json(); } catch { /* sem corpo */ }

@@ -9,7 +9,7 @@
 // Só responde pra quem está logado no painel.
 // =====================================================================
 import { Automation, Conta, chaveFreio, db, ehDaConta, ENV, graphGet, keywordMatches, logDelivery, registrarInteracao, upsertLead } from "../_shared/ig.ts";
-import { contaDoUsuario, CORS, reply, requireUser } from "../_shared/painel.ts";
+import { contaDoUsuario, CORS, ehLeitor, reply, requireUser, SO_LEITURA } from "../_shared/painel.ts";
 
 const DIA_MS = 24 * 3600 * 1000;
 // A Meta aceita resposta privada até 7 dias depois do comentário.
@@ -121,6 +121,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const userId = await requireUser(req);
   if (!userId) return reply({ ok: false, erro: "não autorizado" }, 401);
+  if (await ehLeitor(userId)) return reply({ ok: false, erro: SO_LEITURA }, 403);
 
   let corpo: any = {};
   try { corpo = await req.json(); } catch { /* sem corpo */ }

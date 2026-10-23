@@ -46,6 +46,9 @@ body {
 button, input, textarea, select { font: inherit; color: inherit; }
 a { color: var(--destaque); }
 [hidden] { display: none !important; }
+/* Acesso só de visualização (body.leitor): some tudo que altera dados */
+body.leitor .so-edicao { display: none !important; }
+body:not(.leitor) .so-visualizacao { display: none !important; }
 /* Texto só pra leitor de tela */
 .so-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 

@@ -117,7 +117,7 @@
     const [emoji, formato] = FORMATOS[c.formato] || FORMATOS.outro;
     const feitas = etapasFeitas(c);
     const tema = c.tema || "(sem tema)";
-    return `<button class="cal-card st-${esc(c.status)}" draggable="true" data-id="${esc(c.id)}"
+    return `<button class="cal-card st-${esc(c.status)}" draggable="${!App.leitor}" data-id="${esc(c.id)}"
         aria-label="${esc(`${formato}: ${tema}. ${STATUS[c.status]}. ${feitas} de 4 etapas.`)}" title="${esc(`${formato}: ${tema}`)}">
       <span class="cal-card-tema">${emoji} ${esc(tema)}</span>
       <span class="cal-card-meta"><span class="cal-status">${c.status === "publicado" ? "✓ " : ""}${STATUS[c.status]}</span> · ${feitas}/4${filtroConta === "todas" && variasContas() ? ` · ${esc(nomeConta(c.conta_id))}` : ""}</span>
@@ -142,7 +142,7 @@
       const lista = porDia.get(k) || [];
       celulas += `<div class="cal-dia ${k.slice(0, 7) !== mesIso ? "fora" : ""} ${k === hoje ? "hoje" : ""}" data-dia="${k}">
         <div class="cal-dia-topo"><span class="cal-num">${d.getDate()}</span>
-          <button class="cal-mais" data-novo="${k}" aria-label="Novo conteúdo em ${d.toLocaleDateString("pt-BR")}" title="Novo conteúdo neste dia">+</button></div>
+          <button class="cal-mais so-edicao" data-novo="${k}" aria-label="Novo conteúdo em ${d.toLocaleDateString("pt-BR")}" title="Novo conteúdo neste dia">+</button></div>
         <div class="cal-itens">${lista.map(card).join("")}</div>
       </div>`;
     }
@@ -169,7 +169,7 @@
           ${mesIso !== hoje.slice(0, 7) ? `<button class="btn btn-p" data-cal="hoje">Hoje</button>` : ""}
         </div>
         ${seletor}
-        <button class="btn btn-primario" data-novo=""><span data-icone="mais"></span> Novo conteúdo</button>
+        <button class="btn btn-primario so-edicao" data-novo=""><span data-icone="mais"></span> Novo conteúdo</button>
       </div>
       <p class="pequeno texto-2 cal-resumo">Neste mês: <strong>${doMes.length}</strong> ${doMes.length === 1 ? "conteúdo" : "conteúdos"} · ${cont("a_fazer")} a fazer · ${cont("pronto")} ${cont("pronto") === 1 ? "pronto" : "prontos"} · ${cont("publicado")} ${cont("publicado") === 1 ? "publicado" : "publicados"}</p>
 
@@ -183,7 +183,7 @@
         </div>
         <aside class="cartao cal-ideias" data-dia="">
           <div class="linha-entre"><h2 class="titulo-card">💡 Ideias sem data</h2>
-            <button class="btn btn-p" data-novo="" title="Nova ideia sem data">+ Ideia</button></div>
+            <button class="btn btn-p so-edicao" data-novo="" title="Nova ideia sem data">+ Ideia</button></div>
           <p class="pequeno texto-2" style="margin:4px 0 10px">Arraste uma ideia para um dia do calendário quando ela tiver data.</p>
           <div class="cal-itens">${semData.length ? semData.map(card).join("") : `<p class="pequeno texto-2">Nenhuma ideia guardada.</p>`}</div>
         </aside>
@@ -205,7 +205,7 @@
     fundo.innerHTML = `
       <form class="cartao modal modal-largo cal-form" novalidate aria-labelledby="cal-form-titulo">
         <div class="linha-entre" style="margin-bottom:12px">
-          <h3 class="subtitulo" id="cal-form-titulo">${novo ? "Novo conteúdo" : "Editar conteúdo"}</h3>
+          <h3 class="subtitulo" id="cal-form-titulo">${App.leitor ? "Conteúdo" : novo ? "Novo conteúdo" : "Editar conteúdo"}</h3>
           <button type="button" class="btn btn-icone btn-fantasma" data-f="fechar" aria-label="Fechar">✕</button>
         </div>
         <div class="cal-form-grade">
@@ -229,13 +229,15 @@
         <div class="campo"><label class="rotulo" for="cf-notas">Observações</label>
           <textarea class="textarea" id="cf-notas" rows="2" placeholder="Referências, links, quem grava...">${esc(c.notas)}</textarea></div>
         <div class="linha" style="justify-content:space-between;margin-top:6px">
-          ${novo ? "<span></span>" : `<button type="button" class="btn btn-perigo btn-fantasma" data-f="apagar"><span data-icone="lixo"></span> Excluir</button>`}
-          <div class="linha"><button type="button" class="btn" data-f="fechar">Cancelar</button>
-            <button type="submit" class="btn btn-primario">Salvar</button></div>
+          ${novo ? "<span></span>" : `<button type="button" class="btn btn-perigo btn-fantasma so-edicao" data-f="apagar"><span data-icone="lixo"></span> Excluir</button>`}
+          <div class="linha"><button type="button" class="btn" data-f="fechar">${App.leitor ? "Fechar" : "Cancelar"}</button>
+            <button type="submit" class="btn btn-primario so-edicao">Salvar</button></div>
         </div>
       </form>`;
     pintarIcones(fundo);
     const f = (s) => $(s, fundo);
+    // leitora: só lê (campos travados, sem Salvar nem Excluir)
+    if (App.leitor) $$("input, select, textarea", fundo).forEach((x) => { x.disabled = true; });
     const contar = () => { f("#cf-cont").textContent = `${f("#cf-legenda").value.length}/${LEGENDA_MAX}`; };
     contar();
     const fechar = () => { fundo.remove(); document.removeEventListener("keydown", tecla); };
@@ -264,6 +266,7 @@
     });
     f("form").addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (App.leitor) return;
       const tema = f("#cf-tema").value.trim();
       if (!tema) { aviso("Dê um tema para o conteúdo.", "atencao"); f("#cf-tema").focus(); return; }
       const salvo = {
@@ -291,7 +294,7 @@
       }
     });
     document.body.appendChild(fundo);
-    f("#cf-tema").focus();
+    if (!App.leitor) f("#cf-tema").focus();
   }
 
   // ---------------- Eventos ----------------
@@ -314,11 +317,12 @@
     }
     // clique no espaço vazio de um dia: novo conteúdo naquele dia
     const dia = e.target.closest(".cal-dia");
-    if (dia && !e.target.closest(".cal-card")) abrirEditor({ data: dia.dataset.dia });
+    if (dia && !App.leitor && !e.target.closest(".cal-card")) abrirEditor({ data: dia.dataset.dia });
   });
 
   // Arrastar e soltar: muda a data (ou tira, soltando em "Ideias sem data")
   raiz.addEventListener("dragstart", (e) => {
+    if (App.leitor) return;
     const cartao = e.target.closest?.(".cal-card");
     if (!cartao) return;
     arrastando = cartao.dataset.id;

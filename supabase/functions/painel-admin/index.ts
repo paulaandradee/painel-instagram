@@ -4,8 +4,9 @@
 // - "estado": lista contas, pessoas e quem acessa o quê
 // - "conectar_conta": { token } valida o token, cadastra a conta e assina
 //   os eventos (comentários, mensagens, botões) para o webhook
-// - "criar_pessoa": { email, senha, contas: [ids] }
-// - "definir_acessos": { user_id, contas: [ids] }
+// - "criar_pessoa": { email, senha, contas: [ids], leitor }
+// - "definir_acessos": { user_id, contas: [ids], leitor }
+//   leitor = true: só visualização (vê tudo, não altera nada)
 // - "remover_pessoa": { user_id }
 // =====================================================================
 import { db, graphGet, graphPost } from "../_shared/ig.ts";
@@ -14,17 +15,20 @@ import { CORS, ehAdmin, reply, requireUser } from "../_shared/painel.ts";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 async function estado() {
-  const [{ data: contas }, { data: membros }, { data: admins }, usuarios] = await Promise.all([
+  const [{ data: contas }, { data: membros }, { data: admins }, { data: leitores }, usuarios] = await Promise.all([
     db.from("ig_contas").select("id, username, nome, ativo, token_expira_em, token_ok, token_erro, criado_em").order("criado_em"),
     db.from("ig_membros").select("user_id, conta_id"),
     db.from("painel_admins").select("user_id"),
+    db.from("painel_leitores").select("user_id"),
     db.auth.admin.listUsers({ perPage: 200 }),
   ]);
   const adm = new Set((admins ?? []).map((a: any) => a.user_id));
+  const leit = new Set((leitores ?? []).map((a: any) => a.user_id));
   const pessoas = (usuarios.data?.users ?? []).map((u: any) => ({
     id: u.id,
     email: u.email,
     admin: adm.has(u.id),
+    leitor: leit.has(u.id),
     ultimo_acesso: u.last_sign_in_at,
     contas: (membros ?? []).filter((m: any) => m.user_id === u.id).map((m: any) => m.conta_id),
   })).sort((a: any, b: any) => Number(b.admin) - Number(a.admin) || String(a.email).localeCompare(String(b.email)));
@@ -39,9 +43,12 @@ async function filtrarContas(ids: unknown): Promise<string[]> {
   return (data ?? []).map((c: any) => c.id);
 }
 
-async function definirAcessos(userId: string, contas: string[]) {
+async function definirAcessos(userId: string, contas: string[], leitor: boolean) {
   await db.from("ig_membros").delete().eq("user_id", userId);
   if (contas.length) await db.from("ig_membros").insert(contas.map((conta_id) => ({ user_id: userId, conta_id })));
+  // administradora nunca fica só na visualização
+  if (leitor && !(await ehAdmin(userId))) await db.from("painel_leitores").upsert({ user_id: userId });
+  else await db.from("painel_leitores").delete().eq("user_id", userId);
 }
 
 Deno.serve(async (req) => {
@@ -97,14 +104,14 @@ Deno.serve(async (req) => {
           const ja = /already|registered|exists/i.test(error?.message ?? "");
           return reply({ ok: false, erro: ja ? "Já existe uma pessoa com esse e-mail." : "Não foi possível criar: " + (error?.message ?? "") });
         }
-        await definirAcessos(data.user.id, await filtrarContas(corpo.contas));
+        await definirAcessos(data.user.id, await filtrarContas(corpo.contas), corpo.leitor === true);
         return reply({ ok: true, user_id: data.user.id });
       }
 
       case "definir_acessos": {
         const alvo = String(corpo.user_id ?? "");
         if (!alvo) return reply({ ok: false, erro: "Pessoa não informada." });
-        await definirAcessos(alvo, await filtrarContas(corpo.contas));
+        await definirAcessos(alvo, await filtrarContas(corpo.contas), corpo.leitor === true);
         return reply({ ok: true });
       }
 

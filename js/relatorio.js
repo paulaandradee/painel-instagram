@@ -166,11 +166,11 @@
     const ehHoje = dia === iso(new Date());
     const topo = (rotulo) => `<div class="linha-entre" style="flex-wrap:wrap;gap:8px">
         <h2 class="titulo-card">🧠 Análise das conversas do dia</h2>
-        <button class="btn btn-p" data-rel="analisar" data-dia="${dia}">✨ ${rotulo}</button></div>`;
+        <button class="btn btn-p so-edicao" data-rel="analisar" data-dia="${dia}">✨ ${rotulo}</button></div>`;
     if (vazio) { alvo.innerHTML = `${topo("Gerar análise")}<p class="texto-2">Nenhuma conversa no Direct neste dia.</p>`; return; }
     if (!salvo) {
       alvo.innerHTML = `${topo("Gerar análise")}
-        <p class="texto-2" style="margin:6px 0 0">A IA lê as conversas do Direct deste dia (sem nomes nem dados pessoais) e resume as principais dúvidas, objeções e o perfil dos leads.${ehHoje ? " Como o dia ainda não acabou, vale gerar de novo mais tarde." : ""}</p>`;
+        <p class="texto-2" style="margin:6px 0 0">${App.leitor ? "A análise deste dia ainda não foi gerada pela equipe." : `A IA lê as conversas do Direct deste dia (sem nomes nem dados pessoais) e resume as principais dúvidas, objeções e o perfil dos leads.${ehHoje ? " Como o dia ainda não acabou, vale gerar de novo mais tarde." : ""}`}</p>`;
       return;
     }
     const a = salvo.dados || {};

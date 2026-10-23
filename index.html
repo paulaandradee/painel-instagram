@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Seu Painel</title>
-  <link rel="stylesheet" href="css/estilo.css?v=20261022f">
+  <link rel="stylesheet" href="css/estilo.css?v=20261022g">
 </head>
 <body>
 
@@ -95,7 +95,7 @@
       <h2 class="subtitulo" style="margin:28px 0 12px">Atalhos</h2>
       <div class="linha">
         <a class="btn" href="#instagram"><span data-icone="instagram"></span> Abrir Instagram</a>
-        <button class="btn" id="atalho-nova"><span data-icone="mais"></span> Nova automação</button>
+        <button class="btn so-edicao" id="atalho-nova"><span data-icone="mais"></span> Nova automação</button>
         <a class="btn" href="#calendario"><span data-icone="calendario"></span> Calendário</a>
         <a class="btn" href="https://claude.ai/artifact/1ZLL6HH4AVw84o8bi8NqWe" target="_blank" rel="noopener noreferrer"><span data-icone="jardim"></span> Jardim MultiMeta ↗</a>
         <a class="btn" href="https://www.crmmultimeta.com.br/dashboard" target="_blank" rel="noopener noreferrer"><span data-icone="crm"></span> CRM MultiMeta ↗</a>
@@ -149,7 +149,7 @@
       <div id="aba-automacoes" hidden>
         <div class="linha-entre" style="margin-bottom:14px">
           <p class="texto-2" style="margin:0">Quando alguém comentar a palavra certa, a DM sai sozinha.</p>
-          <button class="btn btn-primario" id="btn-nova"><span data-icone="mais"></span> Nova automação</button>
+          <button class="btn btn-primario so-edicao" id="btn-nova"><span data-icone="mais"></span> Nova automação</button>
         </div>
         <div id="lista-automacoes" class="lista-auto"></div>
       </div>
@@ -175,7 +175,8 @@
     <button class="btn btn-icone btn-fantasma" id="ed-fechar" aria-label="Voltar"><span data-icone="voltar"></span></button>
     <input class="input" id="ed-nome" placeholder="Nome da automação">
     <label class="switch" style="margin-left:auto"><input type="checkbox" id="ed-ativa"><span class="trilho"></span><span class="pequeno">Ligada</span></label>
-    <button class="btn btn-primario" id="ed-salvar">Salvar</button>
+    <span class="chip so-visualizacao">Só visualização</span>
+    <button class="btn btn-primario so-edicao" id="ed-salvar">Salvar</button>
   </div>
 
   <div class="editor-corpo">
@@ -287,14 +288,14 @@
 
 <!-- Cliente oficial do Supabase (se não carregar, o modo local continua funcionando) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=20261022f"></script>
-<script src="js/app.js?v=20261022f"></script>
-<script src="js/editor.js?v=20261022f"></script>
-<script src="js/interacoes.js?v=20261022f"></script>
-<script src="js/conversas.js?v=20261022f"></script>
-<script src="js/relatorio.js?v=20261022f"></script>
-<script src="js/calendario.js?v=20261022f"></script>
-<script src="js/analises.js?v=20261022f"></script>
-<script src="js/acessos.js?v=20261022f"></script>
+<script src="js/config.js?v=20261022g"></script>
+<script src="js/app.js?v=20261022g"></script>
+<script src="js/editor.js?v=20261022g"></script>
+<script src="js/interacoes.js?v=20261022g"></script>
+<script src="js/conversas.js?v=20261022g"></script>
+<script src="js/relatorio.js?v=20261022g"></script>
+<script src="js/calendario.js?v=20261022g"></script>
+<script src="js/analises.js?v=20261022g"></script>
+<script src="js/acessos.js?v=20261022g"></script>
 </body>
 </html>

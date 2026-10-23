@@ -175,7 +175,7 @@
         l.email ? `<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>` : "",
         l.telefone ? `<a href="${linkWhats(l.telefone)}" target="_blank" rel="noopener" title="Abrir no WhatsApp">${esc(formatarTelefone(l.telefone))}</a>` : "",
       ].join("");
-      const tags = (l.tags || []).map((t, i) => `<span class="etiqueta">${esc(t)}<button type="button" data-acao="tag-rem" data-i="${i}" aria-label="Remover etiqueta ${esc(t)}">×</button></span>`).join("");
+      const tags = (l.tags || []).map((t, i) => `<span class="etiqueta">${esc(t)}<button type="button" class="so-edicao" data-acao="tag-rem" data-i="${i}" aria-label="Remover etiqueta ${esc(t)}">×</button></span>`).join("");
       const ult = ultima(l);
       return `
         <tr data-id="${esc(l.ig_user_id)}">
@@ -186,14 +186,14 @@
           <td>${l.last_keyword && l.last_keyword !== "*" ? `<span class="chip">${esc(l.last_keyword)}</span>` : l.last_keyword === "*" ? `<span class="pequeno texto-2">qualquer</span>` : ""}</td>
           <td class="pequeno">${esc(nomeAutomacao(l))}</td>
           <td class="contato">${contato || `<span class="vazio-cel pequeno">sem contato</span>`}</td>
-          <td><div class="etiquetas">${tags}<button type="button" class="btn-etiqueta" data-acao="tag-add" aria-label="Adicionar etiqueta">+ etiqueta</button></div></td>
+          <td><div class="etiquetas">${tags}<button type="button" class="btn-etiqueta so-edicao" data-acao="tag-add" aria-label="Adicionar etiqueta">+ etiqueta</button></div></td>
           <td class="num">${Number(l.interacoes || 0)}</td>
           <td class="num">${Number(l.mensagens_enviadas || 0)}</td>
           <td class="pequeno">${esc(etapa(l))}</td>
           <td>${l.link_sent ? `<span class="status on">Sim</span>` : `<span class="status off">Não</span>`}</td>
           <td class="pequeno" title="${esc(dataCompleta(l.created_at))}">${esc(dataCurta(l.created_at))}</td>
           <td class="pequeno" title="${esc(dataCompleta(ult))}">${esc(relativo(ult))}</td>
-          <td><button type="button" class="btn btn-icone btn-fantasma btn-perigo" data-acao="apagar" aria-label="Excluir dados de ${esc(nome)}" title="Excluir dados (LGPD)">${icone("lixo")}</button></td>
+          <td class="so-edicao"><button type="button" class="btn btn-icone btn-fantasma btn-perigo" data-acao="apagar" aria-label="Excluir dados de ${esc(nome)}" title="Excluir dados (LGPD)">${icone("lixo")}</button></td>
         </tr>`;
     }).join("");
 
@@ -201,7 +201,7 @@
       <thead><tr>
         ${col("pessoa", "Pessoa")}${col("origem", "Origem")}${col("palavra", "Palavra")}${col("automacao", "Automação")}
         ${col("contato", "Contato")}<th>Etiquetas</th>${col("interacoes", "Interações", "num")}${col("enviadas", "DMs enviadas", "num")}
-        ${col("etapa", "Etapa")}${col("link", "Recebeu link")}${col("primeira", "Primeira vez")}${col("ultima", "Última vez")}<th><span class="so-leitor">Ações</span></th>
+        ${col("etapa", "Etapa")}${col("link", "Recebeu link")}${col("primeira", "Primeira vez")}${col("ultima", "Última vez")}<th class="so-edicao"><span class="so-leitor">Ações</span></th>
       </tr></thead>
       <tbody>${linhas || `<tr><td colspan="13" class="texto-2" style="text-align:center;padding:28px">Ninguém encontrado com esses filtros.</td></tr>`}</tbody>`;
 

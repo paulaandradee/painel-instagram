@@ -221,11 +221,11 @@
           ${c.username ? `<a class="pequeno" href="https://instagram.com/${encodeURIComponent(c.username)}" target="_blank" rel="noopener">@${esc(c.username)}</a>` : ""}
         </div>
         <span id="cx-janela"></span>
-        <button class="btn btn-p" data-acao="${c.status === "arquivada" ? "desarquivar" : "arquivar"}">${c.status === "arquivada" ? "Desarquivar" : "Arquivar"}</button>
-        ${c.status === "arquivada" ? `<button class="btn btn-p btn-fantasma btn-perigo" data-acao="excluir" title="Excluir esta conversa do painel"><span data-icone="lixo"></span> Excluir</button>` : ""}
+        <button class="btn btn-p so-edicao" data-acao="${c.status === "arquivada" ? "desarquivar" : "arquivar"}">${c.status === "arquivada" ? "Desarquivar" : "Arquivar"}</button>
+        ${c.status === "arquivada" ? `<button class="btn btn-p btn-fantasma btn-perigo so-edicao" data-acao="excluir" title="Excluir esta conversa do painel"><span data-icone="lixo"></span> Excluir</button>` : ""}
       </div>
       <div class="cx-msgs" id="cx-msgs"></div>
-      <div class="cx-resposta">
+      <div class="cx-resposta so-edicao">
         <div id="cx-sug-aviso"></div>
         <div id="cx-anexo"></div>
         <textarea class="textarea" id="cx-texto" maxlength="${TEXTO_MAX}" placeholder="Escreva a resposta..." aria-label="Resposta"></textarea>
@@ -448,6 +448,7 @@
 
   // ---------------- Sugestão sob demanda ----------------
   async function pedirSugestao(conversaId, manual = false) {
+    if (App.leitor) return; // só visualização: não gasta a cota da IA
     if (!manual && pedidas.has(conversaId)) return;
     pedidas.add(conversaId);
     gerandoPara = conversaId;
@@ -587,16 +588,18 @@
         <p class="texto-2 pequeno" style="margin:4px 0 12px">Cole aqui como o time atende: tom de voz, o que oferecer, preços, links, o que nunca dizer. A IA segue este texto em todas as sugestões de @${esc(App.conta.username || "conta")}.</p>
         <textarea class="textarea" rows="14" placeholder="Ex: Somos acolhedoras e diretas. Sempre perguntamos o nome do projeto antes de passar valores..."></textarea>
         <div class="linha" style="justify-content:flex-end; margin-top:14px">
-          <button type="button" class="btn" data-r="0">Cancelar</button>
-          <button type="submit" class="btn btn-primario">Salvar roteiro</button>
+          <button type="button" class="btn" data-r="0">${App.leitor ? "Fechar" : "Cancelar"}</button>
+          <button type="submit" class="btn btn-primario so-edicao">Salvar roteiro</button>
         </div>
       </form>`;
     const caixa = $("textarea", fundo);
     caixa.value = data?.texto ?? "";
+    caixa.readOnly = App.leitor;
     const fechar = () => fundo.remove();
     fundo.addEventListener("click", (e) => { if (e.target === fundo || e.target.dataset.r === "0") fechar(); });
     $("form", fundo).addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (App.leitor) return;
       const { error } = await sb.from("abordagem").upsert(
         { conta_id: App.conta.id, texto: caixa.value.trim(), atualizada_em: new Date().toISOString() },
         { onConflict: "conta_id" },
@@ -606,7 +609,7 @@
       fechar();
     });
     document.body.appendChild(fundo);
-    caixa.focus();
+    if (!App.leitor) caixa.focus();
   }
 
   // ---------------- Tempo real ----------------

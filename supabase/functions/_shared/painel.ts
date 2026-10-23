@@ -29,6 +29,13 @@ export async function ehAdmin(userId: string): Promise<boolean> {
   return !!data;
 }
 
+// Acesso só de visualização (tabela painel_leitores): vê tudo, não altera nada
+export async function ehLeitor(userId: string): Promise<boolean> {
+  const { data } = await db.from("painel_leitores").select("user_id").eq("user_id", userId).maybeSingle();
+  return !!data;
+}
+export const SO_LEITURA = "Seu acesso é só de visualização.";
+
 // A conta, se a pessoa tiver acesso a ela (membro); senão null
 export async function contaDoUsuario(userId: string, contaId: string): Promise<Conta | null> {
   if (!contaId) return null;
