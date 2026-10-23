@@ -609,7 +609,7 @@ details.avancado .grade2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8
 @media (max-width: 900px) { .rel-analise-grade { grid-template-columns: 1fr; } }
 
 /* ---------- Conversas (caixa de entrada com sugestão da IA) ---------- */
-.cx { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; height: calc(100vh - 230px); min-height: 480px; }
+.cx { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 16px; height: calc(100vh - 230px); min-height: 480px; }
 .cx-lista, .cx-chat { padding: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .cx-lista-topo { display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid var(--borda); }
 .cx-lista-topo .input { flex: 1; min-width: 0; }
