@@ -614,6 +614,9 @@ details.avancado .grade2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8
 .cx-lista-topo { display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid var(--borda); }
 .cx-lista-topo .input { flex: 1; min-width: 0; }
 .cx-filtro-linha { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 12px 4px; }
+.cx-filtro-linha .segmentado { display: flex; width: 100%; }
+.cx-filtro-linha .segmentado button { flex: 1; padding-left: 6px; padding-right: 6px; white-space: nowrap; }
+.cx-conta { font-size: 12px; opacity: .75; }
 .cx-acoes { display: flex; align-items: center; gap: 8px; }
 .cx-ferramentas { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; flex-wrap: wrap; }
 .cx-ferramentas .btn-icone { font-size: 16px; }

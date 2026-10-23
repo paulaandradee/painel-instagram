@@ -31,7 +31,8 @@
   let editado = false;    // você mexeu no texto? então sugestão nova não sobrescreve
   let anexo = null;       // { arquivo, tipo, previa } esperando o Enviar
   let gravacao = null;    // { gravador, partes, inicio, timer, stream }
-  let verArquivadas = false;
+  const CAIXAS = { aguardando: "Aguardando", respondida: "Respondidas", arquivada: "Arquivadas" };
+  let caixa = "aguardando"; // caixa aberta: aguardando, respondida ou arquivada
   let busca = "";
   let canal = null;       // assinatura do Realtime
   let esperaLista = null;
@@ -61,10 +62,18 @@
   async function lerConversas() {
     let q = sb.from("conversas").select("*").eq("conta_id", App.conta.id)
       .order("ultima_mensagem_em", { ascending: false }).limit(200);
-    q = verArquivadas ? q.eq("status", "arquivada") : q.neq("status", "arquivada");
+    q = q.eq("status", caixa);
     const { data, error } = await q;
     if (error) throw error;
     return data ?? [];
+  }
+
+  // Quantas conversas em cada caixa (pros números dos botões)
+  async function lerContagens() {
+    const contar = (status) => sb.from("conversas").select("id", { count: "exact", head: true })
+      .eq("conta_id", App.conta.id).eq("status", status).then((r) => r.count ?? 0);
+    const n = await Promise.all(Object.keys(CAIXAS).map(contar));
+    return Object.fromEntries(Object.keys(CAIXAS).map((k, i) => [k, n[i]]));
   }
 
   async function lerMensagens(conversaId) {
@@ -124,8 +133,8 @@
           </div>
           <div class="cx-filtro-linha">
             <div class="segmentado" role="group" aria-label="Quais conversas">
-              <button class="${verArquivadas ? "" : "ativo"}" data-acao="abertas" aria-pressed="${!verArquivadas}">Abertas</button>
-              <button class="${verArquivadas ? "ativo" : ""}" data-acao="arquivadas" aria-pressed="${verArquivadas}">Arquivadas</button>
+${Object.entries(CAIXAS).map(([k, nome]) => `
+              <button class="${k === caixa ? "ativo" : ""}" data-caixa="${k}" aria-pressed="${k === caixa}">${nome} <span class="cx-conta" data-conta-caixa="${k}"></span></button>`).join("")}
             </div>
           </div>
           <div class="cx-itens" id="cx-itens"><div class="texto-2 pequeno" style="padding:14px">Carregando...</div></div>
@@ -169,6 +178,9 @@
     catch (e) { console.warn(e); $("#cx-itens").innerHTML = `<div class="texto-2 pequeno" style="padding:14px">Não foi possível ler as conversas. Rodou o 11_conversas.sql?</div>`; return; }
     if (atual) atual = conversas.find((c) => c.id === atual.id) ?? atual;
     renderLista();
+    lerContagens().then((n) => {
+      $$("[data-conta-caixa]").forEach((el) => { el.textContent = n[el.dataset.contaCaixa] ? `(${n[el.dataset.contaCaixa]})` : ""; });
+    }).catch(() => { /* sem números */ });
   }
 
   // ---------------- Desenhar: lista ----------------
@@ -179,7 +191,7 @@
     const lista = t ? conversas.filter((c) => norm(`${c.nome} ${c.username}`).includes(t)) : conversas;
     if (!lista.length) {
       alvo.innerHTML = `<div class="texto-2 pequeno" style="padding:18px; text-align:center">${
-        conversas.length ? "Nenhuma conversa com essa busca." : verArquivadas ? "Nenhuma conversa arquivada." : "Quando alguém mandar mensagem no direct, a conversa aparece aqui."}</div>`;
+        conversas.length ? "Nenhuma conversa com essa busca." : caixa === "aguardando" ? "Nenhuma conversa aguardando resposta. 🎉" : caixa === "respondida" ? "Nenhuma conversa respondida." : "Nenhuma conversa arquivada."}</div>`;
       return;
     }
     alvo.innerHTML = lista.map((c) => `
@@ -553,7 +565,7 @@
     if (!atual) return;
     const { error } = await sb.from("conversas").update({ status }).eq("id", atual.id);
     if (error) return aviso("Não foi possível alterar agora.", "erro");
-    aviso(status === "arquivada" ? "Conversa arquivada." : "Conversa de volta nas abertas.");
+    aviso(status === "arquivada" ? "Conversa arquivada." : `Conversa de volta em ${CAIXAS[status]}.`);
     atual = null;
     renderChat();
     carregarLista();
@@ -652,6 +664,13 @@
   raiz.addEventListener("click", (e) => {
     const item = e.target.closest("[data-conversa]");
     if (item) return abrir(item.dataset.conversa);
+    const bCaixa = e.target.closest("[data-caixa]");
+    if (bCaixa) {
+      if (bCaixa.dataset.caixa === caixa) return;
+      caixa = bCaixa.dataset.caixa;
+      atual = null;
+      return carregar();
+    }
     const b = e.target.closest("[data-acao]");
     if (!b || b.disabled) return;
     const acao = b.dataset.acao;
@@ -666,14 +685,10 @@
     if (acao === "coracao") return enviarCoracao();
     if (acao === "voltar") { atual = null; renderChat(); renderLista(); return; }
     if (acao === "arquivar") return mudarStatus("arquivada");
-    if (acao === "desarquivar") return mudarStatus("respondida");
+    // desarquivar: volta pra Aguardando se a última mensagem é da cliente; senão, Respondidas
+    if (acao === "desarquivar") return mudarStatus(atual?.ultima_do_cliente_em && new Date(atual.ultima_do_cliente_em) >= new Date(atual.ultima_mensagem_em) ? "aguardando" : "respondida");
     if (acao === "excluir") return excluirConversa();
     if (acao === "roteiro") return abrirRoteiro();
-    if (acao === "abertas" || acao === "arquivadas") {
-      verArquivadas = acao === "arquivadas";
-      atual = null;
-      return carregar();
-    }
   });
 
   raiz.addEventListener("change", (e) => {

@@ -393,3 +393,11 @@ sorteados entre um envio e outro. Erro claro do Instagram é tentado no máximo 
 ambíguo nunca é repetido. A resposta pública sorteia entre a original e 6 variações. A
 repescagem (comentários e Direct) fica desligada no servidor; só volta com o segredo
 `REPESCAGEM=ligada` no Supabase.
+
+## Caixas da aba Conversas
+
+Rode `supabase/sql/20_caixas_conversas.sql`. A aba tem três caixas, com a quantidade em cada:
+**Aguardando**, **Respondidas** e **Arquivadas**. Respondeu (pelo painel, celular ou robô): vai
+para Respondidas. Arquivou: vai para Arquivadas e fica lá mesmo se sair resposta. Só volta para
+Aguardando quando a cliente manda mensagem nova. Desarquivar leva para Aguardando se a última
+mensagem é da cliente; senão, para Respondidas.
