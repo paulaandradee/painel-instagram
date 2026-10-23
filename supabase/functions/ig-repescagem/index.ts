@@ -122,6 +122,9 @@ Deno.serve(async (req) => {
   const userId = await requireUser(req);
   if (!userId) return reply({ ok: false, erro: "não autorizado" }, 401);
   if (await ehLeitor(userId)) return reply({ ok: false, erro: SO_LEITURA }, 403);
+  // 22/10: repescagem DESLIGADA (a rajada levou o Instagram a avisar "suspeita de automação").
+  // Só volta com o segredo REPESCAGEM=ligada no Supabase.
+  if (Deno.env.get("REPESCAGEM") !== "ligada") return reply({ ok: false, erro: "A repescagem está desligada para proteger a conta." }, 410);
 
   let corpo: any = {};
   try { corpo = await req.json(); } catch { /* sem corpo */ }

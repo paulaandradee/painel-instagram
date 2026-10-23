@@ -9,7 +9,9 @@ import {
   replyToComment, saiuDesde, sendStep, takeSlot, upsertLead,
 } from "../_shared/ig.ts";
 
-const MAX_TENTATIVAS = 5;
+const MAX_TENTATIVAS = 2;   // erro claro (não ambíguo): no máximo 2 tentativas
+const PAUSA_MIN_MS = 8000;  // entre um envio e outro da fila: 8 a 25s, sorteado
+const PAUSA_MAX_MS = 25000; // (rajada certinha parece robô pro Instagram)
 const SETE_DIAS_MS = 7 * 24 * 3600 * 1000; // resposta a comentário só vale ~7 dias
 
 async function drainQueue() {
@@ -20,6 +22,7 @@ async function drainQueue() {
   // Contas cujo freio já disse "não" neste minuto: pula só elas
   const travadas = new Set<string>();
 
+  let jaEnviou = false;
   for (const item of itens ?? []) {
     if (travadas.has(item.conta_id)) { resumo.segurados++; continue; }
 
@@ -53,6 +56,10 @@ async function drainQueue() {
       await db.from("ig_send_queue").update({ status: "enviado", last_error: "já tinha saído (eco)" }).eq("id", item.id);
       continue;
     }
+
+    // Espaça os envios com um intervalo sorteado
+    if (jaEnviou) await new Promise((ok) => setTimeout(ok, PAUSA_MIN_MS + Math.random() * (PAUSA_MAX_MS - PAUSA_MIN_MS)));
+    jaEnviou = true;
 
     const inicio = new Date(Date.now() - 5000).toISOString();
     const r = await sendStep(auto as Automation, step, { comment_id: item.comment_id }, item.ig_user_id);

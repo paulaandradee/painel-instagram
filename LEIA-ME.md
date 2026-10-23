@@ -384,3 +384,12 @@ mas não cria, edita, envia, arquiva nem apaga nada. Quem barra de verdade é o 
 de gravar usam `contas_que_edito()`, que deixa de fora quem está em `painel_leitores`; as
 funções `enviar-resposta`, `conversas-acoes` e `ig-repescagem` também recusam. Administradora
 nunca fica só na visualização.
+
+## Ritmo seguro (aviso de "suspeita de automação", 22/10)
+
+Rode `supabase/sql/19_ritmo_seguro.sql`. O freio passou para **2 DMs por minuto, 20 por hora e
+100 por dia** por conta; o que passar disso espera na fila e sai aos poucos, com 8 a 25 segundos
+sorteados entre um envio e outro. Erro claro do Instagram é tentado no máximo 2 vezes; erro
+ambíguo nunca é repetido. A resposta pública sorteia entre a original e 6 variações. A
+repescagem (comentários e Direct) fica desligada no servidor; só volta com o segredo
+`REPESCAGEM=ligada` no Supabase.

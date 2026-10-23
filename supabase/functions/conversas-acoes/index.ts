@@ -153,6 +153,8 @@ Deno.serve(async (req) => {
 
   // ---------------- Repescagem do Direct ----------------
   if (corpo.acao === "repescar") {
+    // 22/10: desligada para proteger a conta (ver ig-repescagem)
+    if (Deno.env.get("REPESCAGEM") !== "ligada") return reply({ ok: false, erro: "A repescagem está desligada para proteger a conta." }, 410);
     const conta = await contaDoUsuario(userId, String(corpo.conta_id ?? ""));
     if (!conta) return reply({ ok: false, erro: "Sem acesso a esta conta, ou conta sem token." }, 403);
     const r = await candidatas(conta);
