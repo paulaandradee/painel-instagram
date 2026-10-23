@@ -119,9 +119,11 @@ async function handleComment(conta: Conta, value: any) {
   // 5) entrega
   const result = await deliverAutomation(auto, { commentId, igUserId: fromId, username });
 
-  // Só marca o lead e responde no comentário se saiu ou está garantido na fila
+  // Só marca o lead se saiu ou está garantido na fila. Responde no comentário
+  // só quando a DM saiu: se foi pra fila, o carteiro responde junto com a DM
+  // (senão a pessoa lê "te chamei no direct" e a DM ainda não chegou).
   if (result === "ok" || result === "throttled") {
-    await replyToComment(auto, commentId);
+    if (result === "ok") await replyToComment(auto, commentId);
     await upsertLead(conta.id, fromId, {
       username, last_source: "comment", last_keyword: keyword, automation_id: auto.id,
     });

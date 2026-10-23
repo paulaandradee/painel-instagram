@@ -93,7 +93,7 @@ async function drainQueue() {
     if (r.ok) {
       await db.from("ig_send_queue").update({ status: "enviado", sent_at: new Date().toISOString() }).eq("id", item.id);
       await upsertLead(item.conta_id, item.ig_user_id, { username: item.username, last_source: "comment" });
-      // Repescagem: responde também no comentário, se foi pedido
+      // Responde no comentário junto com a DM (fila do freio ou repescagem)
       if (item.responder_publico) await replyToComment(auto as Automation, item.comment_id);
       resumo.enviados++;
     } else {

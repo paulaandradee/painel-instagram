@@ -405,6 +405,7 @@ export async function deliverAutomation(
       ig_user_id: ctx.igUserId,
       username: ctx.username ?? null,
       status: "pendente",
+      responder_publico: true, // a resposta no comentário sai junto com a DM
     }, { onConflict: "comment_id", ignoreDuplicates: true });
     if (error) {
       await logDelivery({ ...base, tipo: "flow", status: "erro", motivo: "falhou ao enfileirar: " + error.message });
