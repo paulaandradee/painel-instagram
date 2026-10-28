@@ -105,8 +105,8 @@ async function trazer(conta: Conta, c: Candidata): Promise<boolean> {
   });
   const { error } = await db.from("mensagens").upsert(linhas, { onConflict: "instagram_message_id", ignoreDuplicates: true });
   if (error) { console.error("[repescar dm] não gravou mensagens:", error.message); return false; }
-  // sem resposta = aguardando (mesmo se estava arquivada)
-  await db.from("conversas").update({ status: "aguardando" }).eq("id", conversa.id);
+  // sem resposta = aguardando (mesmo se estava arquivada; Família fica em Família)
+  await db.from("conversas").update({ status: "aguardando" }).eq("id", conversa.id).neq("status", "familia");
   return true;
 }
 

@@ -401,3 +401,11 @@ Rode `supabase/sql/20_caixas_conversas.sql`. A aba tem três caixas, com a quant
 para Respondidas. Arquivou: vai para Arquivadas e fica lá mesmo se sair resposta. Só volta para
 Aguardando quando a cliente manda mensagem nova. Desarquivar leva para Aguardando se a última
 mensagem é da cliente; senão, para Respondidas.
+
+**Família e "✓ Respondida"** (rode `supabase/sql/21_caixa_familia.sql`): há uma quarta caixa,
+**Família**, para família, amigos e contatos pessoais. Conversa marcada como Família fica lá
+mesmo quando a pessoa escreve de novo, e a IA não gera sugestão automática para ela. "Tirar de
+Família" devolve a conversa para a caixa normal. Em Aguardando, o botão **✓ Respondida** marca
+a conversa como respondida sem enviar nada (por exemplo, quando a automação já respondeu). Ela
+volta para Aguardando só se a pessoa escrever de novo. No computador, o painel já abre a
+próxima conversa da lista.

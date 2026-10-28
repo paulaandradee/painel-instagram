@@ -31,8 +31,13 @@
   let editado = false;    // você mexeu no texto? então sugestão nova não sobrescreve
   let anexo = null;       // { arquivo, tipo, previa } esperando o Enviar
   let gravacao = null;    // { gravador, partes, inicio, timer, stream }
-  const CAIXAS = { aguardando: "Aguardando", respondida: "Respondidas", arquivada: "Arquivadas" };
-  let caixa = "aguardando"; // caixa aberta: aguardando, respondida ou arquivada
+  const CAIXAS = { aguardando: "Aguardando", respondida: "Respondidas", familia: "Família", arquivada: "Arquivadas" };
+  const VAZIA = {
+    aguardando: "Nenhuma conversa aguardando resposta. 🎉", respondida: "Nenhuma conversa respondida.",
+    familia: "Nenhuma conversa em Família. Marque família e amigos aqui: elas não voltam pra Aguardando.", arquivada: "Nenhuma conversa arquivada.",
+  };
+  const ROTULO = { aguardando: "Aguardando resposta", respondida: "Respondida", familia: "Família", arquivada: "Arquivada" };
+  let caixa = "aguardando"; // caixa aberta: aguardando, respondida, familia ou arquivada
   let busca = "";
   let canal = null;       // assinatura do Realtime
   let esperaLista = null;
@@ -191,7 +196,7 @@ ${Object.entries(CAIXAS).map(([k, nome]) => `
     const lista = t ? conversas.filter((c) => norm(`${c.nome} ${c.username}`).includes(t)) : conversas;
     if (!lista.length) {
       alvo.innerHTML = `<div class="texto-2 pequeno" style="padding:18px; text-align:center">${
-        conversas.length ? "Nenhuma conversa com essa busca." : caixa === "aguardando" ? "Nenhuma conversa aguardando resposta. 🎉" : caixa === "respondida" ? "Nenhuma conversa respondida." : "Nenhuma conversa arquivada."}</div>`;
+        conversas.length ? "Nenhuma conversa com essa busca." : VAZIA[caixa]}</div>`;
       return;
     }
     alvo.innerHTML = lista.map((c) => `
@@ -199,7 +204,7 @@ ${Object.entries(CAIXAS).map(([k, nome]) => `
         <span class="avatar" aria-hidden="true">${esc(inicial(c))}</span>
         <span class="cx-item-info">
           <span class="cx-item-nome">${esc(nomeDe(c))}</span>
-          <span class="cx-item-sub">${c.status === "aguardando" ? "Aguardando resposta" : c.status === "respondida" ? "Respondida" : "Arquivada"}</span>
+          <span class="cx-item-sub">${ROTULO[c.status] ?? ""}</span>
         </span>
         <span class="cx-item-lado">
           <span class="cx-item-hora">${esc(quandoCurto(c.ultima_mensagem_em))}</span>
@@ -233,6 +238,9 @@ ${Object.entries(CAIXAS).map(([k, nome]) => `
           ${c.username ? `<a class="pequeno" href="https://instagram.com/${encodeURIComponent(c.username)}" target="_blank" rel="noopener">@${esc(c.username)}</a>` : ""}
         </div>
         <span id="cx-janela"></span>
+        ${c.status === "aguardando" ? `<button class="btn btn-p so-edicao" data-acao="respondida" title="Já está resolvida (ex.: a automação respondeu). Volta pra Aguardando se a pessoa escrever de novo.">✓ Respondida</button>` : ""}
+        ${c.status === "aguardando" || c.status === "respondida" ? `<button class="btn btn-p so-edicao" data-acao="familia" title="Família e amigos: fica em Família mesmo quando a pessoa escrever de novo">Família</button>` : ""}
+        ${c.status === "familia" ? `<button class="btn btn-p so-edicao" data-acao="tirar-familia" title="Volta pra caixa normal (Aguardando ou Respondidas)">Tirar de Família</button>` : ""}
         <button class="btn btn-p so-edicao" data-acao="${c.status === "arquivada" ? "desarquivar" : "arquivar"}">${c.status === "arquivada" ? "Desarquivar" : "Arquivar"}</button>
         ${c.status === "arquivada" ? `<button class="btn btn-p btn-fantasma btn-perigo so-edicao" data-acao="excluir" title="Excluir esta conversa do painel"><span data-icone="lixo"></span> Excluir</button>` : ""}
       </div>
@@ -484,7 +492,7 @@ ${Object.entries(CAIXAS).map(([k, nome]) => `
   // Abriu uma conversa sem sugestão, a última mensagem é dela (há mais de 1 min,
   // senão o webhook ainda está gerando) e ainda dá pra responder? Pede uma.
   function talvezPedirSugestao() {
-    if (!atual || sugestao || !msgs.length) return;
+    if (!atual || sugestao || !msgs.length || atual.status === "familia") return;
     const ultima = msgs[msgs.length - 1];
     if (ultima.autor !== "cliente" || passouDaCliente(atual) > JANELA_HUMANA_MS) return;
     if (Date.now() - new Date(ultima.criada_em).getTime() < 60e3) return;
@@ -561,15 +569,23 @@ ${Object.entries(CAIXAS).map(([k, nome]) => `
     catch { /* a vigia traz */ }
   }
 
+  // Muda a caixa da conversa aberta. No computador, já abre a próxima da
+  // lista (pra conferir várias em sequência, ex.: as que a automação respondeu).
   async function mudarStatus(status) {
     if (!atual) return;
     const { error } = await sb.from("conversas").update({ status }).eq("id", atual.id);
-    if (error) return aviso("Não foi possível alterar agora.", "erro");
-    aviso(status === "arquivada" ? "Conversa arquivada." : `Conversa de volta em ${CAIXAS[status]}.`);
+    if (error) return aviso(/check/i.test(error.message) ? "Rode o 21_caixa_familia.sql antes." : "Não foi possível alterar agora.", "erro");
+    aviso(status === "arquivada" ? "Conversa arquivada." : status === "familia" ? "Conversa movida pra Família." : `Conversa movida pra ${CAIXAS[status]}.`);
+    const i = conversas.findIndex((c) => c.id === atual.id);
     atual = null;
     renderChat();
-    carregarLista();
+    await carregarLista();
+    const proxima = conversas[Math.min(i, conversas.length - 1)];
+    if (proxima && window.innerWidth > 760) abrir(proxima.id);
   }
+
+  // Tirar de Família / desarquivar: Aguardando se a última mensagem é da cliente; senão, Respondidas
+  const caixaNormal = (c) => (c?.ultima_do_cliente_em && new Date(c.ultima_do_cliente_em) >= new Date(c.ultima_mensagem_em) ? "aguardando" : "respondida");
 
   // Só conversas arquivadas. Some do painel; no Instagram continua.
   async function excluirConversa() {
@@ -685,8 +701,9 @@ ${Object.entries(CAIXAS).map(([k, nome]) => `
     if (acao === "coracao") return enviarCoracao();
     if (acao === "voltar") { atual = null; renderChat(); renderLista(); return; }
     if (acao === "arquivar") return mudarStatus("arquivada");
-    // desarquivar: volta pra Aguardando se a última mensagem é da cliente; senão, Respondidas
-    if (acao === "desarquivar") return mudarStatus(atual?.ultima_do_cliente_em && new Date(atual.ultima_do_cliente_em) >= new Date(atual.ultima_mensagem_em) ? "aguardando" : "respondida");
+    if (acao === "respondida") return mudarStatus("respondida");
+    if (acao === "familia") return mudarStatus("familia");
+    if (acao === "desarquivar" || acao === "tirar-familia") return mudarStatus(caixaNormal(atual));
     if (acao === "excluir") return excluirConversa();
     if (acao === "roteiro") return abrirRoteiro();
   });

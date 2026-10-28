@@ -17,7 +17,7 @@ const ESPERA_AGRUPAR_MS = 4000; // cliente manda 3 mensagens seguidas = 1 sugest
 
 export type Conversa = {
   id: string; conta_id: string; instagram_user_id: string; nome: string | null; username: string | null;
-  ultima_do_cliente_em: string | null;
+  ultima_do_cliente_em: string | null; status?: string;
 };
 
 // Acha (ou cria) a conversa da pessoa. Na criação, usa o perfil recebido

@@ -181,7 +181,8 @@ async function handleMessage(conta: Conta, ev: any) {
       const conversa = await conversaDe(conta, senderId);
       const novaId = conversa ? await gravarMensagem(conversa, "cliente", textoConversa, mid ?? null, quando, midiaDoEvento(msg)) : null;
       const tocouBotao = !!(postback || msg?.quick_reply);
-      if (conversa && novaId && msg?.text && !tocouBotao) emSegundoPlano(gerarSugestao(conversa, novaId));
+      // Família: sem sugestão automática (não gasta a cota da IA)
+      if (conversa && novaId && msg?.text && !tocouBotao && conversa.status !== "familia") emSegundoPlano(gerarSugestao(conversa, novaId));
     } catch (e) { console.error("[caixa de entrada] mensagem não gravada:", e); }
   }
 
