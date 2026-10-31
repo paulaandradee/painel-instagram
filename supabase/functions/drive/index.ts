@@ -134,10 +134,26 @@ function nomeFinal(sub: number, original: string, tipo: string, jaTem: number) {
 }
 
 // ---------------- Quem pode ----------------
-async function conteudoPermitido(userId: string, conteudoId: string) {
+// Equipe da conta: tudo. Colaboradora (26_colaboradores.sql): só o conteúdo que ela vê,
+// e só envia nas subpastas do papel dela (SUBPASTAS_DO_PAPEL).
+const SUBPASTAS_DO_PAPEL: Record<string, number[]> = { expert: [2], editor: [3, 4] };
+
+async function papelNoConteudo(userId: string, c: any): Promise<string | null> {
+  const { data: k } = await db.from("colaboradores").select("papel").eq("user_id", userId).eq("conta_id", c.conta_id).maybeSingle();
+  if (!k) return null;
+  if (k.papel === "expert" || c.resp_edicao === userId) return k.papel;
+  const { count } = await db.from("tarefas").select("id", { count: "exact", head: true }).eq("conteudo_id", c.id).eq("responsavel", userId);
+  return count ? k.papel : null;
+}
+
+async function conteudoPermitido(userId: string, conteudoId: string, subpasta?: number) {
   const { data: c } = await db.from("conteudos").select("*").eq("id", conteudoId).maybeSingle();
   if (!c) throw new Erro("Conteúdo não encontrado.", 404);
-  if (!(await contaDoUsuario(userId, c.conta_id))) throw new Erro("Sem acesso a esta conta.", 403);
+  if (!(await contaDoUsuario(userId, c.conta_id))) {
+    const papel = await papelNoConteudo(userId, c);
+    if (!papel) throw new Erro("Sem acesso a esta conta.", 403);
+    if (subpasta !== undefined && !SUBPASTAS_DO_PAPEL[papel].includes(subpasta)) throw new Erro(papel === "expert" ? "Você envia arquivos na pasta 02 - Gravações." : "Você envia arquivos nas pastas 03 - Edição e 04 - Aprovados.", 403);
+  }
   const { data: conta } = await db.from("ig_contas").select("recursos").eq("id", c.conta_id).single();
   if (!conta?.recursos?.includes("drive")) throw new Erro("O Drive não está ligado para esta conta.", 403);
   return c;
@@ -286,7 +302,7 @@ Deno.serve(async (req) => {
       return reply({ ok: true, criadas });
     }
     if (acao === "upload_iniciar") {
-      const c = await conteudoPermitido(userId, String(corpo.conteudo_id ?? ""));
+      const c = await conteudoPermitido(userId, String(corpo.conteudo_id ?? ""), Number(corpo.subpasta));
       const sub = Number(corpo.subpasta);
       if (!(sub >= 1 && sub <= 5)) throw new Erro("Escolha a subpasta.");
       const tamanho = Number(corpo.tamanho ?? 0), tipo = String(corpo.tipo || "application/octet-stream");
@@ -314,7 +330,7 @@ Deno.serve(async (req) => {
       return reply({ ok: true, url: local, nome, subpasta: destino.nome });
     }
     if (acao === "upload_concluir") {
-      const c = await conteudoPermitido(userId, String(corpo.conteudo_id ?? ""));
+      const c = await conteudoPermitido(userId, String(corpo.conteudo_id ?? ""), Number(corpo.subpasta));
       const sub = Number(corpo.subpasta);
       const { data: pasta } = await db.from("drive_pastas").select("drive_id").eq("chave", `sub:${c.id}:${sub}`).maybeSingle();
       const g = await google(`/files/${encodeURIComponent(String(corpo.drive_id ?? ""))}?fields=id,name,size,mimeType,webViewLink,parents`);

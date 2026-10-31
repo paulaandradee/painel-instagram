@@ -501,3 +501,23 @@ renomeia ou move a pasta. O arquivo vai direto do navegador para o Google (até 
 nome de versão (Video_Bruto_01, Video_Edicao_V01, Video_Final_Aprovado...) e fica em
 `arquivos`. Nada fica público. O espaço é o do Google Drive da conta (15 GB grátis, dividido
 com Gmail e Fotos).
+
+## Papéis na Produção: expert e editor(a)
+
+Rode `supabase/sql/26_colaboradores.sql` e publique `painel-admin` e `drive`. Em Contas e
+acessos, cada pessoa pode ter, em cada conta com Produção, o papel **Expert / cliente** ou
+**Editor(a) de vídeo**. Esses papéis ficam na tabela `colaboradores`, **não** em `ig_membros`:
+quem colabora nunca vê DMs, leads, conversas, automações, Drive geral nem a Formação.
+
+- **Expert**: vê calendário, conteúdos, roteiros, tarefas e campanha da conta dela; marca
+  "gravando"/"gravado", aprova ou pede ajustes, muda o status das tarefas DELA, comenta e envia
+  arquivos em 02 - Gravações. Relatórios de desempenho só se marcar "vê os relatórios".
+- **Editor(a)**: vê só os conteúdos em que é responsável pela edição ou tem tarefa; marca "em
+  edição"/"editado", envia para aprovação, muda o status das tarefas dele(a), comenta e envia em
+  03 - Edição e 04 - Aprovados.
+- Ninguém dos dois cria ou apaga conteúdo, muda data, roteiro, responsáveis ou estratégia. Quem
+  barra é o banco: políticas e os gatilhos `conteudos_limite_colaborador` e
+  `tarefas_limite_colaborador` (só a etapa do papel e o status/notas da tarefa).
+- No Início, todo mundo com Produção vê **Minhas tarefas** (atrasadas e próximos 14 dias), com
+  "✓ Feita" (pensado para o celular).
+- O acesso "Só visualização" (painel_leitores) continua igual.

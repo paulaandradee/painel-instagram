@@ -49,6 +49,7 @@ a { color: var(--destaque); }
 [hidden] { display: none !important; }
 /* Acesso só de visualização (body.leitor): some tudo que altera dados */
 body.leitor .so-edicao { display: none !important; }
+body.colab .so-equipe { display: none !important; } /* expert/editor: o que é só da equipe */
 body:not(.leitor) .so-visualizacao { display: none !important; }
 /* Texto só pra leitor de tela */
 .so-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -847,3 +848,20 @@ details.avancado .grade2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8
 .drv-nome { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fm-barra.drv-cheio span { background: var(--erro); }
 @media (max-width: 760px) { .drv-arq { grid-template-columns: minmax(0, 1fr) auto; } .drv-arq .pequeno { grid-column: 1 / -1; grid-row: 2; } }
+
+/* ---------- Minhas tarefas (Início) ---------- */
+.pd-minha { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--borda); }
+.pd-minha:last-child { border-bottom: 0; }
+.pd-minha-data { font-size: 12.5px; font-weight: 650; color: var(--texto-2); text-transform: capitalize; }
+.pd-minha.atrasada .pd-minha-data { color: var(--erro); }
+.pd-minha-info { display: flex; flex-direction: column; gap: 1px; text-align: left; border: 0; background: none; padding: 0; cursor: pointer; font: inherit; color: inherit; min-width: 0; }
+.pd-minha-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 600px) { .pd-minha { grid-template-columns: minmax(0, 1fr) auto; } .pd-minha-data { grid-column: 1 / -1; } }
+.cal-sem-criar [data-novo], .cal-sem-criar [data-nova-tarefa] { display: none !important; }
+
+/* ---------- Papéis na Produção (acessos.js / ficha.js) ---------- */
+.ac-colab { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.ac-colab-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.ac-colab-linha > span { min-width: 130px; font-weight: 550; }
+.ac-colab-linha .select { width: auto; }
+.fi-papel { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 12px; border-radius: var(--raio-p); background: var(--destaque-suave); }

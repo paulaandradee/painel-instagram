@@ -28,6 +28,8 @@
   // Monta a troca Desempenho / Atendimentos. Devolve o container dos
   // Atendimentos, ou null quando Desempenho está aberto.
   function montar(raiz, carregarAtendimentos) {
+    // expert com relatórios liberados: só Desempenho (Atendimentos tem dados de seguidores)
+    if (papelNa(App.conta?.id)) { raiz.innerHTML = `<div id="rel-modo-corpo"></div>`; carregar($("#rel-modo-corpo", raiz)); return null; }
     raiz.innerHTML = `
       <div class="segmentado rel-modo" role="group" aria-label="Qual relatório">
         <button class="${modo === "desempenho" ? "ativo" : ""}" data-rel-modo="desempenho" aria-pressed="${modo === "desempenho"}">📈 Desempenho</button>
@@ -156,11 +158,11 @@
 
   function render(alvo) {
     alvo.innerHTML = `
-      ${faixaColeta()}
+      ${papelNa(App.conta?.id) ? "" : faixaColeta()}
       <div class="barra-ferramentas dsp-acoes">
         ${lista.length ? `<select class="select" data-dsp="escolher" aria-label="Relatório">${lista.map((r) => `<option value="${esc(r.id)}" ${r.id === escolhido ? "selected" : ""}>${esc(nomeRel(r))}</option>`).join("")}</select>` : ""}
-        <button class="btn btn-p so-edicao" data-dsp="semanal" ${gerando ? "disabled" : ""}>Gerar: semana passada</button>
-        <button class="btn btn-p so-edicao" data-dsp="mensal" ${gerando ? "disabled" : ""}>Gerar: mês passado</button>
+        ${papelNa(App.conta?.id) ? "" : `<button class="btn btn-p so-edicao" data-dsp="semanal" ${gerando ? "disabled" : ""}>Gerar: semana passada</button>
+        <button class="btn btn-p so-edicao" data-dsp="mensal" ${gerando ? "disabled" : ""}>Gerar: mês passado</button>`}
         ${atual ? `<button class="btn btn-fantasma" data-dsp="csv"><span data-icone="baixar"></span> CSV</button>
         <button class="btn btn-fantasma" data-dsp="imprimir">Imprimir / PDF</button>` : ""}
       </div>

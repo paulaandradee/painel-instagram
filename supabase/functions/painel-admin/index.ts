@@ -4,8 +4,10 @@
 // - "estado": lista contas, pessoas e quem acessa o quê
 // - "conectar_conta": { token } valida o token, cadastra a conta e assina
 //   os eventos (comentários, mensagens, botões) para o webhook
-// - "criar_pessoa": { email, senha, contas: [ids], leitor }
-// - "definir_acessos": { user_id, contas: [ids], leitor }
+// - "criar_pessoa": { email, senha, contas: [ids], leitor, colaboracoes }
+// - "definir_acessos": { user_id, contas: [ids], leitor, colaboracoes }
+//   colaboracoes = [{ conta_id, papel: "expert" | "editor", ver_relatorios }]
+//   (só contas com Produção; ver 26_colaboradores.sql)
 //   leitor = true: só visualização (vê tudo, não altera nada)
 // - "remover_pessoa": { user_id }
 // =====================================================================
@@ -15,12 +17,13 @@ import { CORS, ehAdmin, reply, requireUser } from "../_shared/painel.ts";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 async function estado() {
-  const [{ data: contas }, { data: membros }, { data: admins }, { data: leitores }, usuarios] = await Promise.all([
-    db.from("ig_contas").select("id, username, nome, ativo, token_expira_em, token_ok, token_erro, criado_em").order("criado_em"),
+  const [{ data: contas }, { data: membros }, { data: admins }, { data: leitores }, usuarios, { data: colab }] = await Promise.all([
+    db.from("ig_contas").select("id, username, nome, ativo, recursos, token_expira_em, token_ok, token_erro, criado_em").order("criado_em"),
     db.from("ig_membros").select("user_id, conta_id"),
     db.from("painel_admins").select("user_id"),
     db.from("painel_leitores").select("user_id"),
     db.auth.admin.listUsers({ perPage: 200 }),
+    db.from("colaboradores").select("user_id, conta_id, papel, ver_relatorios"),
   ]);
   const adm = new Set((admins ?? []).map((a: any) => a.user_id));
   const leit = new Set((leitores ?? []).map((a: any) => a.user_id));
@@ -31,6 +34,7 @@ async function estado() {
     leitor: leit.has(u.id),
     ultimo_acesso: u.last_sign_in_at,
     contas: (membros ?? []).filter((m: any) => m.user_id === u.id).map((m: any) => m.conta_id),
+    colaboracoes: (colab ?? []).filter((k: any) => k.user_id === u.id).map(({ conta_id, papel, ver_relatorios }: any) => ({ conta_id, papel, ver_relatorios })),
   })).sort((a: any, b: any) => Number(b.admin) - Number(a.admin) || String(a.email).localeCompare(String(b.email)));
   return { ok: true, contas: contas ?? [], pessoas };
 }
@@ -43,12 +47,28 @@ async function filtrarContas(ids: unknown): Promise<string[]> {
   return (data ?? []).map((c: any) => c.id);
 }
 
-async function definirAcessos(userId: string, contas: string[], leitor: boolean) {
+// Colaborações (expert / editor) só em contas com Produção e que a pessoa
+// não acessa como equipe (quem é equipe já tem acesso completo)
+async function filtrarColaboracoes(lista: unknown, contasEquipe: string[]) {
+  const itens = (Array.isArray(lista) ? lista : [])
+    .filter((k: any) => ["expert", "editor"].includes(k?.papel) && !contasEquipe.includes(String(k?.conta_id)));
+  if (!itens.length) return [];
+  const { data } = await db.from("ig_contas").select("id, recursos").in("id", itens.map((k: any) => String(k.conta_id)));
+  const comProducao = new Set((data ?? []).filter((c: any) => c.recursos?.includes("producao")).map((c: any) => c.id));
+  return itens.filter((k: any) => comProducao.has(String(k.conta_id)))
+    .map((k: any) => ({ conta_id: String(k.conta_id), papel: k.papel, ver_relatorios: k.papel === "expert" && k.ver_relatorios === true }));
+}
+
+async function definirAcessos(userId: string, contas: string[], leitor: boolean, colaboracoes: { conta_id: string; papel: string; ver_relatorios: boolean }[] = []) {
   await db.from("ig_membros").delete().eq("user_id", userId);
   if (contas.length) await db.from("ig_membros").insert(contas.map((conta_id) => ({ user_id: userId, conta_id })));
   // administradora nunca fica só na visualização
   if (leitor && !(await ehAdmin(userId))) await db.from("painel_leitores").upsert({ user_id: userId });
   else await db.from("painel_leitores").delete().eq("user_id", userId);
+  await db.from("colaboradores").delete().eq("user_id", userId);
+  if (colaboracoes.length && !(await ehAdmin(userId))) {
+    await db.from("colaboradores").insert(colaboracoes.map((k) => ({ user_id: userId, ...k })));
+  }
 }
 
 Deno.serve(async (req) => {
@@ -99,19 +119,23 @@ Deno.serve(async (req) => {
         const senha = String(corpo.senha ?? "");
         if (!EMAIL_RE.test(email)) return reply({ ok: false, erro: "E-mail inválido." });
         if (senha.length < 8) return reply({ ok: false, erro: "A senha precisa ter pelo menos 8 caracteres." });
+        const contasNova = await filtrarContas(corpo.contas);
+        const colabNova = await filtrarColaboracoes(corpo.colaboracoes, contasNova);
+        if (!contasNova.length && !colabNova.length) return reply({ ok: false, erro: "Marque pelo menos uma conta ou um papel na Produção." });
         const { data, error } = await db.auth.admin.createUser({ email, password: senha, email_confirm: true });
         if (error || !data?.user) {
           const ja = /already|registered|exists/i.test(error?.message ?? "");
           return reply({ ok: false, erro: ja ? "Já existe uma pessoa com esse e-mail." : "Não foi possível criar: " + (error?.message ?? "") });
         }
-        await definirAcessos(data.user.id, await filtrarContas(corpo.contas), corpo.leitor === true);
+        await definirAcessos(data.user.id, contasNova, corpo.leitor === true, colabNova);
         return reply({ ok: true, user_id: data.user.id });
       }
 
       case "definir_acessos": {
         const alvo = String(corpo.user_id ?? "");
         if (!alvo) return reply({ ok: false, erro: "Pessoa não informada." });
-        await definirAcessos(alvo, await filtrarContas(corpo.contas), corpo.leitor === true);
+        const contasAlvo = await filtrarContas(corpo.contas);
+        await definirAcessos(alvo, contasAlvo, corpo.leitor === true, await filtrarColaboracoes(corpo.colaboracoes, contasAlvo));
         return reply({ ok: true });
       }
 

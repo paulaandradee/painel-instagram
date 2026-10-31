@@ -74,7 +74,8 @@
 
   // ---------------- Pedaço da ficha (aba Arquivos) ----------------
   // Devolve o HTML; os botões têm data-drv e são tratados por tratarCliqueFicha
-  function htmlFicha(c, s, arquivos, enviando) {
+  // permitidas: subpastas em que a pessoa pode enviar (null = todas; expert = 2, editor = 3 e 4)
+  function htmlFicha(c, s, arquivos, enviando, permitidas = null) {
     if (!s) return `<p class="pequeno texto-2">Conferindo o Drive...</p>`;
     if (!s.configurado || !s.conectado) {
       return `<div class="faixa faixa-atencao">${icone("info")}<span>O Google Drive ainda não está conectado. ${App.admin ? `Conecte em <a href="#drive">Drive e Arquivos</a>.` : "Peça para a administradora conectar."}</span></div>`;
@@ -87,7 +88,7 @@
           : `<button type="button" class="btn btn-p so-edicao" data-drv="criar-pasta">📁 Criar pasta no Drive</button>`}
       </div>
       <div class="drv-envio so-edicao">
-        <select class="select" id="drv-sub" aria-label="Subpasta">${SUBPASTAS.map((n, i) => `<option value="${i + 1}" ${i === 1 ? "selected" : ""}>${n}</option>`).join("")}</select>
+        <select class="select" id="drv-sub" aria-label="Subpasta">${SUBPASTAS.map((n, i) => (permitidas && !permitidas.includes(i + 1) ? "" : `<option value="${i + 1}" ${i + 1 === (permitidas?.[0] ?? 2) ? "selected" : ""}>${n}</option>`)).join("")}</select>
         <button type="button" class="btn btn-primario" data-drv="escolher" ${enviando ? "disabled" : ""}><span data-icone="mais"></span> Enviar arquivo</button>
         <input type="file" id="drv-arquivo" multiple hidden>
         <span class="pequeno texto-2">Até 2 GB por arquivo. Nome automático: Video_Bruto_01, Video_Edicao_V01, Video_Final_Aprovado...</span>

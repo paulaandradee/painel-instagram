@@ -70,7 +70,7 @@
             <span class="avatar" aria-hidden="true">${esc((p.email || "?").charAt(0).toUpperCase())}</span>
             <div class="ac-info">
               <div class="nome-l">${esc(p.email)} ${p.admin ? `<span class="chip chip-destaque">Administradora</span>` : p.leitor ? `<span class="chip">Só visualização</span>` : ""}${p.id === App.usuario.id ? ` <span class="chip">você</span>` : ""}</div>
-              <div class="chips">${p.contas.length ? p.contas.map((id) => `<span class="chip">${esc(nomeConta(id))}</span>`).join("") : `<span class="pequeno texto-2">sem nenhuma conta liberada</span>`}</div>
+              <div class="chips">${p.contas.map((id) => `<span class="chip">${esc(nomeConta(id))}</span>`).join("")}${(p.colaboracoes || []).map((k) => `<span class="chip chip-destaque">${esc(PAPEL_NOME[k.papel])} · ${esc(nomeConta(k.conta_id))}${k.ver_relatorios ? " · relatórios" : ""}</span>`).join("")}${!p.contas.length && !(p.colaboracoes || []).length ? `<span class="pequeno texto-2">sem nenhuma conta liberada</span>` : ""}</div>
             </div>
             <span class="pequeno texto-2">${p.ultimo_acesso ? "último acesso " + new Date(p.ultimo_acesso).toLocaleDateString("pt-BR") : "ainda não entrou"}</span>
             <button class="btn btn-p" data-ac="acessos">Acessos</button>
@@ -105,6 +105,37 @@
   const caixaLeitor = (marcada = false) => `
     <label class="ac-check" style="margin-top:12px"><input type="checkbox" id="ac-leitor" ${marcada ? "checked" : ""}>
       <span><b>Só visualização</b><br><span class="pequeno texto-2">Vê automações, leads, conversas, relatório e calendário, mas não cria, edita, envia nem apaga nada.</span></span></label>`;
+
+  // Papéis na Produção (expert / editor): só contas com Produção. Quem é da
+  // equipe da conta (marcada acima) já tem acesso completo a ela.
+  const contasProducao = () => estado.contas.filter((c) => c.recursos?.includes("producao"));
+  const caixaColaboracao = (atuais = []) => {
+    const contas = contasProducao();
+    if (!contas.length) return "";
+    return `<span class="rotulo" style="margin-top:14px;display:block">Papel na Produção (para quem não é da equipe)</span>
+      <div class="ac-colab">${contas.map((c) => {
+        const k = atuais.find((x) => x.conta_id === c.id);
+        return `<div class="ac-colab-linha" data-colab-conta="${esc(c.id)}">
+          <span>@${esc(c.username)}</span>
+          <select class="select" data-colab-papel aria-label="Papel em @${esc(c.username)}">
+            <option value="">Nenhum</option>
+            <option value="expert" ${k?.papel === "expert" ? "selected" : ""}>Expert / cliente</option>
+            <option value="editor" ${k?.papel === "editor" ? "selected" : ""}>Editor(a) de vídeo</option>
+          </select>
+          <label class="pequeno" ${k?.papel === "expert" ? "" : "hidden"} data-colab-rel><input type="checkbox" ${k?.ver_relatorios ? "checked" : ""}> vê os relatórios de desempenho</label>
+        </div>`;
+      }).join("")}</div>
+      <p class="ajuda"><b>Expert</b>: vê calendário, roteiros e tarefas; marca gravando/gravado, aprova ou pede ajustes, comenta e envia gravações. <b>Editor(a)</b>: só os conteúdos em que edita; marca em edição/editado, envia versões e pede aprovação. Nenhum dos dois vê DMs, leads, automações nem a sua Formação.</p>`;
+  };
+  const colaboracoesEm = (el) => $$("[data-colab-conta]", el).map((l) => ({
+    conta_id: l.dataset.colabConta, papel: $("[data-colab-papel]", l).value,
+    ver_relatorios: $("[data-colab-rel] input", l).checked,
+  })).filter((k) => k.papel);
+  const ligarColaboracao = (el) => el.addEventListener("change", (e) => {
+    const sel = e.target.closest("[data-colab-papel]");
+    if (sel) $("[data-colab-rel]", sel.closest("[data-colab-conta]")).hidden = sel.value !== "expert";
+  });
+  const PAPEL_NOME = { expert: "Expert", editor: "Editor(a)" };
 
   function conectar() {
     janela("Conectar conta de Instagram", `
@@ -141,18 +172,21 @@
       <div class="campo"><label class="rotulo" for="ac-senha">Senha provisória</label>
         <div class="linha"><input class="input" id="ac-senha" value="${senha}" style="flex:1;font-family:ui-monospace,Consolas,monospace"><button class="btn btn-p" id="ac-gerar">Gerar outra</button></div>
         <div class="ajuda">Pelo menos 8 caracteres. Você vai poder copiar e enviar pra ela no final.</div></div>
-      <span class="rotulo">Contas que ela vê</span>
+      <span class="rotulo">Equipe: contas que ela vê no Instagram do painel</span>
       <div class="ac-checks">${caixasContas()}</div>
       ${caixaLeitor()}
+      ${caixaColaboracao()}
       <div class="linha" style="justify-content:flex-end;margin-top:16px"><button class="btn" data-fechar>Cancelar</button><button class="btn btn-primario" id="ac-ok">Criar acesso</button></div>`,
     (el, fechar) => {
       $("#ac-gerar", el).onclick = () => { $("#ac-senha", el).value = senhaAleatoria(); };
+      ligarColaboracao(el);
       $("#ac-ok", el).onclick = async (e) => {
         const btn = e.currentTarget;
         const email = $("#ac-email", el).value.trim(), senha = $("#ac-senha", el).value, contas = marcadasEm(el);
-        if (!contas.length) return aviso("Marque pelo menos uma conta.", "atencao");
+        const colaboracoes = colaboracoesEm(el);
+        if (!contas.length && !colaboracoes.length) return aviso("Marque pelo menos uma conta ou um papel na Produção.", "atencao");
         btn.disabled = true; btn.textContent = "Criando...";
-        const r = await Dados.admin("criar_pessoa", { email, senha, contas, leitor: $("#ac-leitor", el).checked });
+        const r = await Dados.admin("criar_pessoa", { email, senha, contas, leitor: $("#ac-leitor", el).checked, colaboracoes });
         if (!r?.ok) { btn.disabled = false; btn.textContent = "Criar acesso"; return aviso(r?.erro || "Não foi possível criar.", "erro"); }
         // mostra os dados pra enviar
         const texto = `Seu acesso ao painel:\n${PAINEL_URL}\nE-mail: ${email}\nSenha: ${senha}`;
@@ -174,12 +208,14 @@
       <p class="pequeno texto-2" style="margin:0 0 10px">Marque as contas de Instagram que ${pessoa.id === App.usuario.id ? "você vê" : "ela vê"} no painel.</p>
       <div class="ac-checks">${caixasContas(pessoa.contas)}</div>
       ${pessoa.admin ? "" : caixaLeitor(pessoa.leitor)}
+      ${pessoa.admin ? "" : caixaColaboracao(pessoa.colaboracoes)}
       <div class="linha" style="justify-content:flex-end;margin-top:16px"><button class="btn" data-fechar>Cancelar</button><button class="btn btn-primario" id="ac-ok">Salvar</button></div>`,
     (el, fechar) => {
+      ligarColaboracao(el);
       $("#ac-ok", el).onclick = async (e) => {
         const btn = e.currentTarget, contas = marcadasEm(el);
         btn.disabled = true;
-        const r = await Dados.admin("definir_acessos", { user_id: pessoa.id, contas, leitor: $("#ac-leitor", el)?.checked === true });
+        const r = await Dados.admin("definir_acessos", { user_id: pessoa.id, contas, leitor: $("#ac-leitor", el)?.checked === true, colaboracoes: pessoa.admin ? [] : colaboracoesEm(el) });
         if (!r?.ok) { btn.disabled = false; return aviso(r?.erro || "Não foi possível salvar.", "erro"); }
         fechar();
         aviso("Acessos salvos.", "ok");

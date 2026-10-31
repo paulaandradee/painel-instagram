@@ -104,10 +104,17 @@ const App = {
   conta: null,   // a conta escolhida no momento
   admin: false,  // administradora: conecta contas e libera pessoas
   leitor: false, // só visualização: vê tudo, não altera nada (quem barra é o banco)
+  colab: new Map(), // conta_id -> { papel: "expert" | "editor", ver_relatorios } (26_colaboradores.sql)
+  soColab: false, // só colabora na Produção (não é da equipe de nenhuma conta)
 };
 
 // Filtra uma consulta pela conta, se houver
 const daConta = (consulta, contaId) => (contaId ? consulta.eq("conta_id", contaId) : consulta);
+
+// Papel de colaboração da pessoa logada numa conta: "expert", "editor" ou null (equipe)
+const papelNa = (contaId) => App.colab.get(contaId)?.papel ?? null;
+// Pode criar/editar livremente nesta conta? (equipe, sem "só visualização")
+const editaConta = (contaId) => !App.leitor && !papelNa(contaId);
 
 // =====================================================================
 // CAMADA DE DADOS: toda chamada é tolerante a falha
@@ -134,6 +141,13 @@ const Dados = {
     if (!App.remoto) return false;
     const { data } = await sb.from("painel_leitores").select("user_id").eq("user_id", App.usuario.id).maybeSingle();
     return !!data;
+  },
+
+  // Papéis de colaboração (expert / editor) da pessoa logada
+  async colaboracoes() {
+    if (!App.remoto) return [];
+    const { data } = await sb.from("colaboradores").select("conta_id, papel, ver_relatorios").eq("user_id", App.usuario.id);
+    return data ?? [];
   },
 
   // Contas e acessos (função painel-admin, só administradoras)
@@ -394,15 +408,22 @@ function entrar(usuario) {
 
 // Carrega as contas da pessoa, a conta escolhida e se ela é administradora ou leitora
 async function prepararContas() {
-  try { [App.contas, App.admin, App.leitor] = await Promise.all([Dados.contas(), Dados.souAdmin(), Dados.souLeitor()]); }
+  let colab = [];
+  try { [App.contas, App.admin, App.leitor, colab] = await Promise.all([Dados.contas(), Dados.souAdmin(), Dados.souLeitor(), Dados.colaboracoes()]); }
   catch { App.contas = []; App.admin = false; App.leitor = false; }
+  App.colab = new Map(colab.map((k) => [k.conta_id, k]));
+  App.soColab = App.contas.length > 0 && App.contas.every((c) => App.colab.has(c.id));
+  // Instagram: equipe vê tudo; colaboradora só o Relatório, se liberado
+  App.verInstagram = !App.soColab || colab.some((k) => k.ver_relatorios);
+  $("#menu-instagram").hidden = !App.verInstagram;
+  document.body.classList.toggle("colab", App.soColab); // esconde o que é só da equipe (.so-equipe)
   const salva = memoria.ler("conta_atual", null);
   App.conta = App.contas.find((c) => c.id === salva) || App.contas[0] || null;
   $("#menu-acessos").hidden = !App.admin;
   $("#menu-formacao").hidden = !App.admin;
   App.producao = App.remoto && App.contas.some((c) => c.recursos?.includes("producao"));
   $("#menu-producao").hidden = !App.producao;
-  App.drive = App.remoto && App.contas.some((c) => c.recursos?.includes("drive"));
+  App.drive = App.remoto && App.contas.some((c) => c.recursos?.includes("drive") && !App.colab.has(c.id));
   $("#menu-drive").hidden = !App.drive;
   document.body.classList.toggle("leitor", App.leitor); // esconde os botões de alterar (.so-edicao)
   renderSeletorConta();
@@ -448,7 +469,7 @@ let abaInstagram = memoria.ler("aba_instagram", "automacoes");
 function navegar() {
   if (!App.usuario) return;
   const rota = (location.hash || "#inicio").slice(1).split("?")[0]; // "#drive?drive=conectado" = volta do Google
-  const rotas = ["inicio", "calendario", "instagram"].concat(App.producao ? ["producao"] : [], App.drive ? ["drive"] : [], App.admin ? ["formacao", "acessos"] : []);
+  const rotas = ["inicio", "calendario"].concat(App.verInstagram ? ["instagram"] : [], App.producao ? ["producao"] : [], App.drive ? ["drive"] : [], App.admin ? ["formacao", "acessos"] : []);
   const valida = rotas.includes(rota) ? rota : "inicio";
   $$(".secao").forEach((s) => (s.hidden = s.id !== `secao-${valida}`));
   $$(".menu-item[data-rota]").forEach((m) => m.classList.toggle("ativo", m.dataset.rota === valida));
@@ -481,6 +502,10 @@ async function carregarStatusIg() {
 }
 
 function trocarAba(aba) {
+  // colaboradora (expert com relatórios liberados): só a aba Relatório
+  const soRelatorio = !!papelNa(App.conta?.id);
+  $$("#secao-instagram .aba[data-aba]").forEach((b) => { b.hidden = soRelatorio && b.dataset.aba !== "relatorio"; });
+  if (soRelatorio) aba = "relatorio";
   abaInstagram = aba;
   memoria.gravar("aba_instagram", aba);
   $$(".aba").forEach((b) => b.classList.toggle("ativa", b.dataset.aba === aba));
@@ -501,6 +526,8 @@ function trocarAba(aba) {
 // INÍCIO
 // =====================================================================
 async function carregarInicio() {
+  window.Producao?.minhasTarefas($("#inicio-tarefas")); // tarefas da pessoa (contas com Produção)
+  if (App.soColab) return; // expert/editor: os números do Instagram não são dela
   let c = { leads: 0, ativas: 0, dms7: 0 };
   try { c = await Dados.contagens(); } catch { /* zeros */ }
   $("#n-leads").textContent = c.leads.toLocaleString("pt-BR");

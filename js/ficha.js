@@ -65,6 +65,19 @@
   // item: conteúdo (do banco) ou { conta_id, data } para um novo. aoMudar: o calendário se atualiza.
   async function abrir(item, aoMudar, abaInicial = "geral") {
     const leitor = App.leitor;
+    // expert / editor (26_colaboradores.sql): ficha travada, mas mudam a etapa
+    // do papel delas, o status das próprias tarefas, comentam e enviam arquivos
+    const papel = papelNa(item.conta_id);
+    const travado = leitor || !!papel;
+    const ACOES_DO_PAPEL = {
+      expert: ["comentar", "aprovar", "ajustes", "etapa:gravando", "etapa:gravado"],
+      editor: ["comentar", "pedir-aprovacao", "etapa:em_edicao", "etapa:editado"],
+    };
+    const BOTOES_ETAPA = {
+      expert: [["gravando", "🎥 Comecei a gravar"], ["gravado", "✓ Gravado"]],
+      editor: [["em_edicao", "✂️ Comecei a editar"], ["editado", "✓ Editado"]],
+    };
+    const SUBPASTAS_DO_PAPEL = { expert: [2], editor: [3, 4] };
     let c = { titulo: "", tema: "", pilar: "", objetivo: "", formato: "reels", origem: null, campanha_id: null, hora: null,
       etapa: "ideia", briefing: "", roteiro: "", capa_texto: "", legenda: "", cta: "", referencias: "", drive_pasta_url: "",
       link_publicacao: "", ig_media_id: null, notas: "", data: null, ...item };
@@ -185,22 +198,28 @@
           <input class="input" type="time" data-t="hora" value="${esc(hhmm(t.hora))}" aria-label="Horário">
           <select class="select" data-t="responsavel" aria-label="Responsável"><option value="">Ninguém</option>${membros.map((p) => `<option value="${esc(p.user_id)}" ${p.user_id === t.responsavel ? "selected" : ""}>${esc(p.email.split("@")[0])}</option>`).join("")}</select>
           <select class="select" data-t="status" aria-label="Status">${opcoes(STATUS_TAREFA, t.status)}</select>
-          <button type="button" class="btn btn-icone btn-fantasma so-edicao" data-t-tirar aria-label="Tirar tarefa" title="Tirar tarefa">✕</button>
+          ${travado ? "" : `<button type="button" class="btn btn-icone btn-fantasma" data-t-tirar aria-label="Tirar tarefa" title="Tirar tarefa">✕</button>`}
         </div>`).join("");
+      const botoesPapel = papel && !leitor ? `<div class="fi-papel">
+          <span class="pequeno texto-2">Atualizar a etapa:</span>
+          ${BOTOES_ETAPA[papel].map(([k, n]) => `<button type="button" class="btn ${c.etapa === k ? "btn-primario" : "btn-p"}" data-f="etapa:${k}" ${c.etapa === k ? "disabled" : ""}>${n}</button>`).join("")}
+          ${papel === "editor" ? `<button type="button" class="btn btn-p" data-f="pedir-aprovacao" ${c.etapa === "aguardando_aprovacao" ? "disabled" : ""}>Enviar para aprovação</button>` : ""}
+        </div>` : "";
       return `
-        <p class="pequeno texto-2" style="margin-top:0">${tarefas.filter((t) => t.status === "feita").length} de ${tarefas.length} tarefas feitas. Mudanças aqui salvam na hora e aparecem no Calendário.</p>
+        ${botoesPapel}
+        <p class="pequeno texto-2" style="margin-top:0">${tarefas.filter((t) => t.status === "feita").length} de ${tarefas.length} tarefas feitas.${papel ? " Você muda o status das tarefas que são suas." : " Mudanças aqui salvam na hora e aparecem no Calendário."}</p>
         <div class="fi-tarefas">${linhas || `<p class="texto-2 pequeno">Nenhuma tarefa ainda.</p>`}</div>
-        <div class="linha so-edicao" style="margin-top:10px">
+        ${travado ? "" : `<div class="linha" style="margin-top:10px">
           <button type="button" class="btn btn-p" data-f="tarefa-nova"><span data-icone="mais"></span> Tarefa</button>
           ${tarefas.length ? "" : `<button type="button" class="btn btn-p" data-f="tarefas-padrao">Criar tarefas padrão</button>`}
-        </div>`;
+        </div>`}`;
     }
 
     function painelArquivos() {
       const url = c.drive_pasta_url;
       if (comDrive()) {
         if (novo) return `<p class="texto-2 pequeno">Salve o conteúdo primeiro: a pasta no Drive é criada sozinha.</p>`;
-        return window.Drive.htmlFicha(c, drive.status, drive.arquivos, drive.enviando);
+        return window.Drive.htmlFicha(c, drive.status, drive.arquivos, drive.enviando, papel ? SUBPASTAS_DO_PAPEL[papel] : null);
       }
       return `
         <div class="faixa faixa-info">${icone("info")}<span>O Google Drive não está ligado para esta conta. Cole aqui o link da pasta.</span></div>
@@ -218,10 +237,11 @@
       return `
         <p>Etapa atual: <strong>${esc(ETAPA[e])}</strong></p>
         <div class="linha so-edicao" style="margin-bottom:12px">
-          ${["aguardando_aprovacao", "aprovado", "pronto_agendar", "agendado", "publicado", "em_analise", "finalizado"].includes(e) ? "" : `<button type="button" class="btn btn-p" data-f="pedir-aprovacao">Enviar para aprovação</button>`}
-          ${["aguardando_aprovacao", "ajustes_solicitados"].includes(e) ? `<button type="button" class="btn btn-primario" data-f="aprovar">✓ Aprovar</button>` : ""}
-          ${e === "aguardando_aprovacao" ? `<button type="button" class="btn" data-f="ajustes">Pedir ajustes</button>` : ""}
+          ${papel === "expert" || ["aguardando_aprovacao", "aprovado", "pronto_agendar", "agendado", "publicado", "em_analise", "finalizado"].includes(e) ? "" : `<button type="button" class="btn btn-p" data-f="pedir-aprovacao">Enviar para aprovação</button>`}
+          ${papel !== "editor" && ["aguardando_aprovacao", "ajustes_solicitados"].includes(e) ? `<button type="button" class="btn btn-primario" data-f="aprovar">✓ Aprovar</button>` : ""}
+          ${papel !== "editor" && e === "aguardando_aprovacao" ? `<button type="button" class="btn" data-f="ajustes">Pedir ajustes</button>` : ""}
         </div>
+        ${papel === "expert" && e === "aguardando_aprovacao" ? `<p class="pequeno texto-2">Para pedir ajustes, escreva no comentário abaixo o que precisa mudar e clique em "Pedir ajustes".</p>` : ""}
         <h4 class="rotulo">Comentários internos</h4>
         <div class="fi-comentarios">${comentarios.map(balao).join("") || `<p class="texto-2 pequeno">Nenhum comentário.</p>`}</div>
         <div class="so-edicao" style="margin-top:10px">
@@ -236,8 +256,8 @@
           <div class="campo"><label class="rotulo" for="fi-link_publicacao">Link da publicação</label><input class="input" type="url" id="fi-link_publicacao" value="${esc(c.link_publicacao)}" placeholder="https://www.instagram.com/p/..."></div>
           <div class="campo"><label class="rotulo" for="fi-ig_media_id">ID do post no Instagram</label><input class="input" id="fi-ig_media_id" value="${esc(c.ig_media_id || "")}" readonly></div>
         </div>
-        <div class="linha so-edicao"><button type="button" class="btn btn-p" data-f="escolher-post"><span data-icone="instagram"></span> Escolher o post do Instagram</button>
-          ${c.ig_media_id ? `<button type="button" class="btn btn-fantasma" data-f="desligar-post">Desligar o post</button>` : ""}</div>
+        ${travado ? "" : `<div class="linha"><button type="button" class="btn btn-p" data-f="escolher-post"><span data-icone="instagram"></span> Escolher o post do Instagram</button>
+          ${c.ig_media_id ? `<button type="button" class="btn btn-fantasma" data-f="desligar-post">Desligar o post</button>` : ""}</div>`}
         <div id="fi-posts"></div>
         ${htmlMetricas()}
         <p class="pequeno texto-2">O post é ligado por você, nunca pela data. As métricas vêm da coleta diária (Relatório › Desempenho).</p>`;
@@ -295,25 +315,32 @@
           <div>
             <span class="pequeno texto-2">${novo ? "Novo conteúdo" : `Conteúdo #${esc(c.numero)}`} · @${esc(App.contas.find((x) => x.id === c.conta_id)?.username || "conta")}</span>
             <h3 class="subtitulo" id="fi-titulo">${esc(c.titulo || c.tema || "Sem título")}</h3>
-            <span class="chips"><span class="chip chip-destaque">${esc(ETAPA[c.etapa] ?? c.etapa)}</span>${c.origem ? `<span class="chip">${esc(ORIGENS[c.origem])}</span>` : ""}${leitor ? `<span class="chip">Só visualização</span>` : ""}</span>
+            <span class="chips"><span class="chip chip-destaque">${esc(ETAPA[c.etapa] ?? c.etapa)}</span>${c.origem ? `<span class="chip">${esc(ORIGENS[c.origem])}</span>` : ""}${leitor ? `<span class="chip">Só visualização</span>` : ""}${papel ? `<span class="chip">${papel === "expert" ? "Você: expert" : "Você: editor(a)"}</span>` : ""}</span>
           </div>
           <button type="button" class="btn btn-icone btn-fantasma" data-f="fechar" aria-label="Fechar">✕</button>
         </div>
         <div class="abas fi-abas" role="tablist">${ABAS.map(([k, n]) => `<button type="button" class="aba ${k === aba ? "ativa" : ""}" role="tab" aria-selected="${k === aba}" data-fi-aba="${k}">${n}</button>`).join("")}</div>
         <div class="fi-corpo">${PAINEIS[aba]()}</div>
         <div class="fi-rodape">
-          ${novo ? "<span></span>" : `<button type="button" class="btn btn-perigo btn-fantasma so-edicao" data-f="apagar"><span data-icone="lixo"></span> Excluir</button>`}
-          <div class="linha"><button type="button" class="btn" data-f="fechar">${leitor ? "Fechar" : "Cancelar"}</button>
-            <button type="submit" class="btn btn-primario so-edicao">${novo ? "Criar conteúdo" : "Salvar"}</button></div>
+          ${novo || travado ? "<span></span>" : `<button type="button" class="btn btn-perigo btn-fantasma" data-f="apagar"><span data-icone="lixo"></span> Excluir</button>`}
+          <div class="linha"><button type="button" class="btn" data-f="fechar">${travado ? "Fechar" : "Cancelar"}</button>
+            ${travado ? "" : `<button type="submit" class="btn btn-primario">${novo ? "Criar conteúdo" : "Salvar"}</button>`}</div>
         </div>`;
       pintarIcones(form);
-      if (leitor) $$("input, select, textarea", form).forEach((x) => { x.disabled = true; });
+      if (travado) $$("input, select, textarea", form).forEach((x) => { x.disabled = true; });
+      // colaboradora: libera só o que é dela (status das próprias tarefas, comentário, envio)
+      if (papel && !leitor) {
+        $$("[data-tarefa]", form).forEach((linha) => {
+          if (tarefas.find((t) => t.id === linha.dataset.tarefa)?.responsavel === App.usuario.id) $("[data-t=status]", linha).disabled = false;
+        });
+        ["#fi-novo-comentario", "#drv-sub", "#drv-arquivo"].forEach((s) => { const el = f(s); if (el) el.disabled = false; });
+      }
     }
 
     // ---------- ações ----------
     const fechar = () => { fundo.remove(); document.removeEventListener("keydown", tecla); };
     const tentarFechar = async () => {
-      if (sujo && !leitor && !(await confirmar("Sair sem salvar?", "As mudanças da ficha que não foram salvas se perdem. Tarefas e comentários já estão salvos.", "Sair sem salvar", true))) return;
+      if (sujo && !travado && !(await confirmar("Sair sem salvar?", "As mudanças da ficha que não foram salvas se perdem. Tarefas e comentários já estão salvos.", "Sair sem salvar", true))) return;
       fechar();
     };
     const tecla = (e) => { if (e.key === "Escape" && !$(".modal-fundo:last-child .modal:not(.modal-ficha)")) tentarFechar(); };
@@ -423,7 +450,7 @@
         return;
       }
       const tirar = e.target.closest("[data-t-tirar]");
-      if (tirar && !leitor) {
+      if (tirar && !travado) {
         const id = tirar.closest("[data-tarefa]").dataset.tarefa;
         const { error } = await sb.from("tarefas").delete().eq("id", id);
         if (error) return aviso("Não foi possível tirar a tarefa.", "erro");
@@ -449,6 +476,7 @@
       if (!a) return;
       if (a === "fechar") return tentarFechar();
       if (leitor) return;
+      if (papel && !ACOES_DO_PAPEL[papel].includes(a)) return; // o banco também barra
       if (a === "apagar") {
         const ok = await confirmar("Excluir conteúdo?", `"${c.titulo || c.tema}" sai do calendário com as tarefas, comentários e o histórico. Não dá para desfazer.`, "Excluir", true);
         if (!ok) return;
@@ -458,6 +486,7 @@
       }
       if (a === "tarefas-padrao") { lerFormulario(); return criarTarefas(tarefasPadrao(c)); }
       if (a === "tarefa-nova") return criarTarefas([{ tipo: "outro", titulo: "", data: c.data }]);
+      if (a.startsWith("etapa:")) return mudarEtapa(a.slice(6));
       if (a === "pedir-aprovacao") return mudarEtapa("aguardando_aprovacao");
       if (a === "aprovar") return mudarEtapa("aprovado", { texto: f("#fi-novo-comentario")?.value.trim() || "Aprovado.", tipo: "aprovacao" });
       if (a === "ajustes") {
@@ -500,11 +529,11 @@
       }
       if (e.target.id?.startsWith("fi-")) sujo = true;
     });
-    form.addEventListener("submit", (e) => { e.preventDefault(); if (!leitor) salvar(); });
+    form.addEventListener("submit", (e) => { e.preventDefault(); if (!travado) salvar(); });
 
     desenhar();
     document.body.appendChild(fundo);
-    if (novo && !leitor) f("#fi-titulo-in")?.focus();
+    if (novo && !travado) f("#fi-titulo-in")?.focus();
   }
 
   window.Ficha = { abrir, ETAPAS, ETAPA, TIPOS_TAREFA, ORIGENS };

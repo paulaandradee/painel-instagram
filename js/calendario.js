@@ -210,14 +210,14 @@
     const conta = filtroConta === "todas" && variasContas() ? ` · ${esc(nomeConta(c.conta_id))}` : "";
     if (temProducao(c.conta_id)) {
       const etapa = window.Ficha?.ETAPA[c.etapa] ?? c.etapa;
-      return `<button class="cal-card st-${esc(c.status)}" draggable="${!App.leitor}" data-id="${esc(c.id)}"
+      return `<button class="cal-card st-${esc(c.status)}" draggable="${editaConta(c.conta_id)}" data-id="${esc(c.id)}"
           aria-label="${esc(`${formato}: ${tema}. ${etapa}.`)}" title="${esc(`${formato}: ${tema}`)}">
         <span class="cal-card-tema">${c.hora ? `${esc(hhmm(c.hora))} ` : ""}${emoji} ${esc(tema)}</span>
         <span class="cal-card-meta"><span class="cal-status">${esc(etapa)}</span>${c.origem ? ` · ${esc(window.Ficha?.ORIGENS[c.origem] ?? c.origem)}` : ""}${conta}</span>
       </button>`;
     }
     const feitas = etapasFeitas(c);
-    return `<button class="cal-card st-${esc(c.status)}" draggable="${!App.leitor}" data-id="${esc(c.id)}"
+    return `<button class="cal-card st-${esc(c.status)}" draggable="${editaConta(c.conta_id)}" data-id="${esc(c.id)}"
         aria-label="${esc(`${formato}: ${tema}. ${STATUS[c.status]}. ${feitas} de 4 etapas.`)}" title="${esc(`${formato}: ${tema}`)}">
       <span class="cal-card-tema">${emoji} ${esc(tema)}</span>
       <span class="cal-card-meta"><span class="cal-status">${c.status === "publicado" ? "✓ " : ""}${STATUS[c.status]}</span> · ${feitas}/4${conta}</span>
@@ -227,7 +227,7 @@
   function cardTarefa(t) {
     const dono = itens.find((c) => c.id === t.conteudo_id);
     const nome = t.titulo || TIPOS_TAREFA[t.tipo].replace(/^\S+\s/, "");
-    return `<button class="cal-card cal-tarefa tp-${esc(t.tipo)} st-${esc(t.status)}" draggable="${!App.leitor}" data-tarefa="${esc(t.id)}"
+    return `<button class="cal-card cal-tarefa tp-${esc(t.tipo)} st-${esc(t.status)}" draggable="${editaConta(t.conta_id)}" data-tarefa="${esc(t.id)}"
         aria-label="${esc(`${TIPOS_TAREFA[t.tipo]}: ${nome}${dono ? `, de ${dono.titulo || dono.tema}` : ""}. ${t.status === "feita" ? "Feita" : "A fazer"}.`)}"
         title="${esc(`${TIPOS_TAREFA[t.tipo]}: ${nome}${dono ? ` · ${dono.titulo || dono.tema}` : ""}`)}">
       <span class="cal-card-tema">${t.hora ? `${esc(hhmm(t.hora))} ` : ""}${esc(TIPOS_TAREFA[t.tipo].split(" ")[0])} ${t.status === "feita" ? "✓ " : ""}${esc(nome)}</span>
@@ -356,10 +356,16 @@
         </aside>` : ""}
       </div>`;
     pintarIcones(alvo);
+    alvo.classList.toggle("cal-sem-criar", !podeCriar()); // expert/editor: sem botões de criar
   }
 
   // ---------------- Abrir: ficha completa ou formulário simples ----------------
-  function contaPadrao() { return filtroConta !== "todas" ? filtroConta : (App.conta?.id || contas()[0].id); }
+  // conta de um item novo: a do filtro, a escolhida ou a primeira em que a pessoa edita
+  function contaPadrao() {
+    if (filtroConta !== "todas") return filtroConta;
+    return (editaConta(App.conta?.id) ? App.conta?.id : contas().find((c) => editaConta(c.id))?.id) || App.conta?.id || contas()[0].id;
+  }
+  const podeCriar = () => App.remoto ? contasVisiveis().some((c) => editaConta(c.id)) : true;
 
   function abrirConteudo(item) {
     const contaId = item.conta_id || contaPadrao();
@@ -490,8 +496,9 @@
       if (c) return window.Ficha.abrir(c, () => carregar(true), "producao");
     }
     const novo = !t.id;
-    const contasProd = contas().filter((c) => temProducao(c.id));
+    const contasProd = contas().filter((c) => temProducao(c.id) && editaConta(c.id));
     const v = { tipo: "compromisso", titulo: "", data: iso(ref), hora: null, status: "a_fazer", notas: "", conta_id: temProducao(contaPadrao()) ? contaPadrao() : contasProd[0]?.id, ...t };
+    const pode = editaConta(v.conta_id);
     const fundo = document.createElement("div");
     fundo.className = "modal-fundo";
     fundo.innerHTML = `
@@ -510,13 +517,13 @@
         </div>
         <div class="campo"><label class="rotulo" for="ct-notas">Notas</label><textarea class="textarea" id="ct-notas" rows="2">${esc(v.notas)}</textarea></div>
         <div class="linha" style="justify-content:space-between;margin-top:6px">
-          ${novo ? "<span></span>" : `<button type="button" class="btn btn-perigo btn-fantasma so-edicao" data-f="apagar"><span data-icone="lixo"></span> Excluir</button>`}
-          <div class="linha"><button type="button" class="btn" data-f="fechar">${App.leitor ? "Fechar" : "Cancelar"}</button><button type="submit" class="btn btn-primario so-edicao">Salvar</button></div>
+          ${novo || !pode ? "<span></span>" : `<button type="button" class="btn btn-perigo btn-fantasma so-edicao" data-f="apagar"><span data-icone="lixo"></span> Excluir</button>`}
+          <div class="linha"><button type="button" class="btn" data-f="fechar">${!pode ? "Fechar" : "Cancelar"}</button>${pode ? `<button type="submit" class="btn btn-primario">Salvar</button>` : ""}</div>
         </div>
       </form>`;
     pintarIcones(fundo);
     const f = (s) => $(s, fundo);
-    if (App.leitor) $$("input, select, textarea", fundo).forEach((x) => { x.disabled = true; });
+    if (!pode) $$("input, select, textarea", fundo).forEach((x) => { x.disabled = true; });
     const fechar = () => fundo.remove();
     fundo.addEventListener("click", async (e) => {
       if (e.target === fundo || e.target.closest("[data-f=fechar]")) return fechar();
@@ -528,7 +535,7 @@
     });
     f("form").addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (App.leitor) return;
+      if (!pode) return;
       const titulo = f("#ct-titulo").value.trim();
       if (!titulo) { aviso("Escreva o que é.", "atencao"); return; }
       const linha = { titulo, tipo: f("#ct-tipo").value, data: f("#ct-data").value || null, hora: f("#ct-hora").value || null,
@@ -544,6 +551,7 @@
 
   // ---------------- Campanha ----------------
   function abrirCampanha(k) {
+    const pode = editaConta(k.conta_id); // expert vê a campanha, não altera
     const fundo = document.createElement("div");
     fundo.className = "modal-fundo";
     fundo.innerHTML = `
@@ -560,14 +568,14 @@
         <div class="campo"><label class="rotulo" for="ck-objetivo">Objetivo</label><textarea class="textarea" id="ck-objetivo" rows="3">${esc(k.objetivo)}</textarea></div>
         <div class="campo"><label class="rotulo" for="ck-notas">Notas e pendências</label><textarea class="textarea" id="ck-notas" rows="4">${esc(k.notas)}</textarea></div>
         <div class="linha" style="justify-content:flex-end;margin-top:6px">
-          <button type="button" class="btn" data-f="fechar">${App.leitor ? "Fechar" : "Cancelar"}</button><button type="submit" class="btn btn-primario so-edicao">Salvar</button></div>
+          <button type="button" class="btn" data-f="fechar">${!pode ? "Fechar" : "Cancelar"}</button>${pode ? `<button type="submit" class="btn btn-primario">Salvar</button>` : ""}</div>
       </form>`;
     const f = (s) => $(s, fundo);
-    if (App.leitor) $$("input, select, textarea", fundo).forEach((x) => { x.disabled = true; });
+    if (!pode) $$("input, select, textarea", fundo).forEach((x) => { x.disabled = true; });
     fundo.addEventListener("click", (e) => { if (e.target === fundo || e.target.closest("[data-f=fechar]")) fundo.remove(); });
     f("form").addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (App.leitor) return;
+      if (!pode) return;
       const nome = f("#ck-nome").value.trim();
       if (!nome) return aviso("Dê um nome à campanha.", "atencao");
       const { error } = await sb.from("campanhas").update({
@@ -615,7 +623,7 @@
     if (e.target.closest(".cal-num") && recursosAvancados()) { ref = deIso(e.target.closest(".cal-dia").dataset.dia); visao = "dia"; memoria.gravar("cal_visao", visao); return carregar(); }
     // clique no espaço vazio de um dia: novo conteúdo naquele dia
     const dia = e.target.closest(".cal-dia");
-    if (dia && !App.leitor && !e.target.closest(".cal-card")) abrirConteudo({ data: dia.dataset.dia });
+    if (dia && editaConta(contaPadrao()) && !e.target.closest(".cal-card")) abrirConteudo({ data: dia.dataset.dia });
   });
 
   // Arrastar e soltar: muda a data (ou tira, soltando em "Ideias sem data")
@@ -623,7 +631,8 @@
     const cartao = e.target.closest?.(".cal-card");
     if (!cartao) return;
     const tipo = cartao.dataset.estudo ? "estudo" : cartao.dataset.tarefa ? "tarefa" : cartao.dataset.id ? "conteudo" : null;
-    if (!tipo || (App.leitor && tipo !== "estudo")) { e.preventDefault(); return; }
+    const contaDoCartao = tipo === "conteudo" ? itens.find((x) => x.id === cartao.dataset.id)?.conta_id : tipo === "tarefa" ? tarefas.find((x) => x.id === cartao.dataset.tarefa)?.conta_id : null;
+    if (!tipo || (tipo !== "estudo" && !editaConta(contaDoCartao))) { e.preventDefault(); return; }
     arrastando = { tipo, id: cartao.dataset.estudo || cartao.dataset.tarefa || cartao.dataset.id };
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", arrastando.id);

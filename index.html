@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Seu Painel</title>
-  <link rel="stylesheet" href="css/estilo.css?v=20261031e">
+  <link rel="stylesheet" href="css/estilo.css?v=20261031f">
 </head>
 <body>
 
@@ -61,14 +61,14 @@
       <a class="menu-item" href="#calendario" data-rota="calendario" title="Calendário"><span data-icone="calendario"></span> <span class="txt">Calendário</span></a>
       <a class="menu-item" href="#producao" data-rota="producao" id="menu-producao" title="Produção de Conteúdo" hidden><span data-icone="grade"></span> <span class="txt">Produção</span></a>
       <a class="menu-item" href="#drive" data-rota="drive" id="menu-drive" title="Drive e Arquivos" hidden><span data-icone="arquivo"></span> <span class="txt">Drive e Arquivos</span></a>
-      <a class="menu-item" href="#instagram" data-rota="instagram" title="Instagram"><span data-icone="instagram"></span> <span class="txt">Instagram</span></a>
+      <a class="menu-item" href="#instagram" data-rota="instagram" id="menu-instagram" title="Instagram"><span data-icone="instagram"></span> <span class="txt">Instagram</span></a>
       <a class="menu-item" href="#formacao" data-rota="formacao" id="menu-formacao" title="Formação Sebrae" hidden><span data-icone="capelo"></span> <span class="txt">Formação Sebrae</span></a>
       <a class="menu-item" href="#acessos" data-rota="acessos" id="menu-acessos" title="Contas e acessos" hidden><span data-icone="cadeado"></span> <span class="txt">Contas e acessos</span></a>
       <!-- Atalhos externos: abrem numa aba nova -->
-      <span class="menu-grupo">Atalhos</span>
-      <a class="menu-item" href="https://claude.ai/artifact/1ZLL6HH4AVw84o8bi8NqWe" target="_blank" rel="noopener noreferrer" title="Jardim MultiMeta (abre numa aba nova)"><span data-icone="jardim"></span> <span class="txt">Jardim MultiMeta <span class="externo" aria-hidden="true">↗</span></span></a>
-      <a class="menu-item" href="https://www.crmmultimeta.com.br/dashboard" target="_blank" rel="noopener noreferrer" title="CRM MultiMeta (abre numa aba nova)"><span data-icone="crm"></span> <span class="txt">CRM MultiMeta <span class="externo" aria-hidden="true">↗</span></span></a>
-      <a class="menu-item" href="https://fifth-sunday-ce4.notion.site/rea-de-trabalho-Paula-2998db03d7e3807f9cf1da49c970a1f1" target="_blank" rel="noopener noreferrer" title="Área de trabalho no Notion (abre numa aba nova)"><span data-icone="notion"></span> <span class="txt">Área de trabalho <span class="externo" aria-hidden="true">↗</span></span></a>
+      <span class="menu-grupo so-equipe">Atalhos</span>
+      <a class="menu-item so-equipe" href="https://claude.ai/artifact/1ZLL6HH4AVw84o8bi8NqWe" target="_blank" rel="noopener noreferrer" title="Jardim MultiMeta (abre numa aba nova)"><span data-icone="jardim"></span> <span class="txt">Jardim MultiMeta <span class="externo" aria-hidden="true">↗</span></span></a>
+      <a class="menu-item so-equipe" href="https://www.crmmultimeta.com.br/dashboard" target="_blank" rel="noopener noreferrer" title="CRM MultiMeta (abre numa aba nova)"><span data-icone="crm"></span> <span class="txt">CRM MultiMeta <span class="externo" aria-hidden="true">↗</span></span></a>
+      <a class="menu-item so-equipe" href="https://fifth-sunday-ce4.notion.site/rea-de-trabalho-Paula-2998db03d7e3807f9cf1da49c970a1f1" target="_blank" rel="noopener noreferrer" title="Área de trabalho no Notion (abre numa aba nova)"><span data-icone="notion"></span> <span class="txt">Área de trabalho <span class="externo" aria-hidden="true">↗</span></span></a>
     </nav>
     <div class="rodape-lateral">
       <div class="usuario" id="usuario-email"></div>
@@ -90,15 +90,17 @@
           <p class="texto-2" style="margin:4px 0 0">Uma visão rápida do que está acontecendo.</p>
         </div>
       </div>
-      <div class="grade-cartoes">
+      <div class="grade-cartoes so-equipe">
         <div class="cartao kpi"><div class="numero" id="n-leads">0</div><span class="kpi-rotulo">Leads captados</span></div>
         <div class="cartao kpi"><div class="numero" id="n-ativas">0</div><span class="kpi-rotulo">Automações ativas</span></div>
         <div class="cartao kpi"><div class="numero" id="n-dms">0</div><span class="kpi-rotulo">DMs enviadas (7 dias)</span></div>
       </div>
       <!-- Formação: só a administradora vê (formacao.js) -->
       <div id="inicio-formacao" style="margin-top:16px" hidden></div>
-      <h2 class="subtitulo" style="margin:28px 0 12px">Atalhos</h2>
-      <div class="linha">
+      <!-- Minhas tarefas: contas com Produção (producao.js) -->
+      <div id="inicio-tarefas" style="margin-top:16px" hidden></div>
+      <h2 class="subtitulo so-equipe" style="margin:28px 0 12px">Atalhos</h2>
+      <div class="linha so-equipe">
         <a class="btn" href="#instagram"><span data-icone="instagram"></span> Abrir Instagram</a>
         <button class="btn so-edicao" id="atalho-nova"><span data-icone="mais"></span> Nova automação</button>
         <a class="btn" href="#calendario"><span data-icone="calendario"></span> Calendário</a>
@@ -326,19 +328,19 @@
 
 <!-- Cliente oficial do Supabase (se não carregar, o modo local continua funcionando) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=20261031e"></script>
-<script src="js/app.js?v=20261031e"></script>
-<script src="js/editor.js?v=20261031e"></script>
-<script src="js/interacoes.js?v=20261031e"></script>
-<script src="js/conversas.js?v=20261031e"></script>
-<script src="js/desempenho.js?v=20261031e"></script>
-<script src="js/relatorio.js?v=20261031e"></script>
-<script src="js/drive.js?v=20261031e"></script>
-<script src="js/ficha.js?v=20261031e"></script>
-<script src="js/calendario.js?v=20261031e"></script>
-<script src="js/producao.js?v=20261031e"></script>
-<script src="js/formacao.js?v=20261031e"></script>
-<script src="js/analises.js?v=20261031e"></script>
-<script src="js/acessos.js?v=20261031e"></script>
+<script src="js/config.js?v=20261031f"></script>
+<script src="js/app.js?v=20261031f"></script>
+<script src="js/editor.js?v=20261031f"></script>
+<script src="js/interacoes.js?v=20261031f"></script>
+<script src="js/conversas.js?v=20261031f"></script>
+<script src="js/desempenho.js?v=20261031f"></script>
+<script src="js/relatorio.js?v=20261031f"></script>
+<script src="js/drive.js?v=20261031f"></script>
+<script src="js/ficha.js?v=20261031f"></script>
+<script src="js/calendario.js?v=20261031f"></script>
+<script src="js/producao.js?v=20261031f"></script>
+<script src="js/formacao.js?v=20261031f"></script>
+<script src="js/analises.js?v=20261031f"></script>
+<script src="js/acessos.js?v=20261031f"></script>
 </body>
 </html>

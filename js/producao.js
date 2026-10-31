@@ -71,14 +71,15 @@
     const [, lista] = colunas()[Math.max(0, colunaDe(c.etapa))];
     const resp = [["resp_gravacao", "🎥"], ["resp_edicao", "✂️"], ["resp_aprovacao", "✅"]]
       .filter(([k]) => c[k]).map(([k, e]) => `${e} ${esc((membros.get(c[k]) || "alguém").split("@")[0])}`).join(" · ");
-    return `<div class="pd-card ${atrasadas ? "atrasado" : ""}" draggable="${!App.leitor}" data-id="${esc(c.id)}">
+    const pode = editaConta(c.conta_id); // expert/editor mudam a etapa pela ficha
+    return `<div class="pd-card ${atrasadas ? "atrasado" : ""}" draggable="${pode}" data-id="${esc(c.id)}">
       <button class="pd-abrir" data-abrir="${esc(c.id)}" title="Abrir a ficha">
         <span class="pequeno texto-2">#${esc(c.numero)} · ${c.data ? esc(dataCurta(c.data)) : "sem data"}${contasProd().length > 1 && filtroConta === "todas" ? ` · ${esc(nomeConta(c.conta_id))}` : ""}</span>
         <strong class="pd-titulo">${FORMATOS[c.formato] || "✨"} ${esc(c.titulo || c.tema || "Sem título")}</strong>
       </button>
       <div class="chips">${c.origem ? `<span class="chip">${esc(ORIGENS[c.origem])}</span>` : ""}${camp ? `<span class="chip chip-destaque">${esc(camp.nome)}</span>` : ""}${ts.length ? `<span class="chip">${feitas}/${ts.length} tarefas</span>` : ""}${atrasadas ? `<span class="chip pd-chip-atraso">${atrasadas} atrasada${atrasadas === 1 ? "" : "s"}</span>` : ""}</div>
       ${resp ? `<div class="pequeno texto-2 pd-resp">${resp}</div>` : ""}
-      <select class="select pd-etapa" data-etapa="${esc(c.id)}" aria-label="Etapa" ${App.leitor ? "disabled" : ""}>
+      <select class="select pd-etapa" data-etapa="${esc(c.id)}" aria-label="Etapa" ${pode ? "" : "disabled"}>
         ${lista.map(([k, n]) => `<option value="${k}" ${k === c.etapa ? "selected" : ""}>${esc(n)}</option>`).join("")}
       </select>
     </div>`;
@@ -102,7 +103,7 @@
           <button class="${mostrar === "ativos" ? "ativo" : ""}" data-mostrar="ativos" aria-pressed="${mostrar === "ativos"}">Em andamento</button>
           <button class="${mostrar === "todos" ? "ativo" : ""}" data-mostrar="todos" aria-pressed="${mostrar === "todos"}">Com finalizados</button>
         </div>
-        <button class="btn btn-primario so-edicao" data-pd-novo><span data-icone="mais"></span> Novo conteúdo</button>
+        ${contasProd().some((c) => editaConta(c.id)) ? `<button class="btn btn-primario" data-pd-novo><span data-icone="mais"></span> Novo conteúdo</button>` : ""}
       </div>
       <p class="pequeno texto-2" style="margin:0 0 12px">${lista.length} ${lista.length === 1 ? "conteúdo" : "conteúdos"}. Arraste o cartão para outra coluna ou escolha a etapa exata no cartão. Muda também na ficha e no Calendário.</p>
       <div class="pd-quadro">
@@ -135,7 +136,8 @@
     const abrir = e.target.closest("[data-abrir]");
     if (abrir) { const c = itens.find((x) => x.id === abrir.dataset.abrir); if (c) window.Ficha.abrir(c, recarregar); return; }
     if (e.target.closest("[data-pd-novo]")) {
-      const conta = filtroConta !== "todas" ? filtroConta : (contasProd().find((c) => c.id === App.conta?.id) ?? contasProd()[0]).id;
+      const conta = filtroConta !== "todas" && editaConta(filtroConta) ? filtroConta : (contasProd().find((c) => c.id === App.conta?.id && editaConta(c.id)) ?? contasProd().find((c) => editaConta(c.id)))?.id;
+      if (!conta) return;
       return window.Ficha.abrir({ conta_id: conta, data: null }, recarregar);
     }
     const m = e.target.closest("[data-mostrar]");
@@ -156,7 +158,7 @@
 
   raiz.addEventListener("dragstart", (e) => {
     const card = e.target.closest?.(".pd-card");
-    if (!card || App.leitor || e.target.closest("select")) return;
+    if (!card || e.target.closest("select") || !editaConta(itens.find((x) => x.id === card.dataset.id)?.conta_id)) return;
     arrastando = card.dataset.id;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", arrastando);
@@ -186,5 +188,49 @@
     mudarEtapa(id, colunas()[i][1][0][0]); // primeira etapa da coluna
   });
 
-  window.Producao = { carregar };
+  // ---------------- Minhas tarefas (Início) ----------------
+  // As tarefas da pessoa logada ainda não feitas: atrasadas e dos próximos 14 dias
+  async function minhasTarefas(alvo) {
+    if (!alvo) return;
+    if (!App.remoto || !contasProd().length) { alvo.hidden = true; return; }
+    const ate = new Date(Date.now() + 14 * 864e5);
+    const limite = `${ate.getFullYear()}-${String(ate.getMonth() + 1).padStart(2, "0")}-${String(ate.getDate()).padStart(2, "0")}`;
+    const { data, error } = await sb.from("tarefas").select("*, conteudos(id, numero, titulo, tema, data, conta_id)")
+      .eq("responsavel", App.usuario.id).neq("status", "feita").lte("data", limite).order("data").limit(30);
+    if (error) { alvo.hidden = true; return; }
+    const lista = data ?? [];
+    const tipos = window.Ficha.TIPOS_TAREFA;
+    alvo.hidden = false;
+    alvo.innerHTML = `<div class="cartao fm-bloco">
+      <div class="linha-entre"><h2 class="titulo-card">✅ Minhas tarefas</h2><a class="pequeno" href="#producao">Produção →</a></div>
+      ${lista.length ? lista.map((t) => {
+        const atrasada = t.data && t.data < hoje();
+        return `<div class="pd-minha ${atrasada ? "atrasada" : ""}">
+          <span class="pd-minha-data">${t.data ? esc(dataCurta(t.data)) : "sem data"}${t.hora ? ` ${esc(String(t.hora).slice(0, 5))}` : ""}</span>
+          <button class="pd-minha-info" data-minha-abrir="${esc(t.conteudos?.id || "")}" ${t.conteudos ? "" : "disabled"}>
+            <strong>${esc(tipos[t.tipo] || t.tipo)}${t.titulo ? `: ${esc(t.titulo)}` : ""}</strong>
+            ${t.conteudos ? `<span class="pequeno texto-2">${esc(t.conteudos.titulo || t.conteudos.tema)}</span>` : ""}
+          </button>
+          ${App.leitor ? "" : `<button class="btn btn-p" data-minha-feita="${esc(t.id)}">✓ Feita</button>`}
+        </div>`;
+      }).join("") : `<p class="texto-2 pequeno">Nenhuma tarefa sua pendente nos próximos 14 dias. 🎉</p>`}
+    </div>`;
+    alvo.onclick = async (e) => {
+      const feita = e.target.closest("[data-minha-feita]");
+      if (feita) {
+        feita.disabled = true;
+        const { error: erro } = await sb.from("tarefas").update({ status: "feita" }).eq("id", feita.dataset.minhaFeita);
+        if (erro) { feita.disabled = false; return aviso("Não foi possível marcar agora.", "erro"); }
+        aviso("Tarefa feita. ✓", "ok");
+        return minhasTarefas(alvo);
+      }
+      const abrir = e.target.closest("[data-minha-abrir]");
+      if (abrir?.dataset.minhaAbrir) {
+        const { data: c } = await sb.from("conteudos").select("*").eq("id", abrir.dataset.minhaAbrir).maybeSingle();
+        if (c) window.Ficha.abrir(c, () => minhasTarefas(alvo), "producao");
+      }
+    };
+  }
+
+  window.Producao = { carregar, minhasTarefas };
 })();
