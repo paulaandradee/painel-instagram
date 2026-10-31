@@ -183,6 +183,35 @@ Deno.serve(async (req) => {
     let link = null;
     let pedido: any = {};
     try { pedido = await req.json(); } catch { /* sem corpo */ }
+    // { criar_pastas: <conta_id> }: cria as pastas que faltam (como o botão do painel)
+    if (pedido?.criar_pastas) {
+      const { data: conta } = await db.from("ig_contas").select("recursos").eq("id", String(pedido.criar_pastas)).maybeSingle();
+      if (!conta?.recursos?.includes("drive")) return json({ ok: false, erro: "conta sem o recurso drive" });
+      const { data: lista } = await db.from("conteudos").select("*").eq("conta_id", String(pedido.criar_pastas)).limit(60);
+      const nomes = [];
+      for (const c of lista ?? []) { const p = await pastaDoConteudo(c); nomes.push(p.link ? c.titulo : "?"); }
+      return json({ ok: true, criadas: nomes.length });
+    }
+    // { teste_envio: <conteudo_id> } abre um envio de 1 arquivinho na subpasta 01 (para conferir o envio direto);
+    // { apagar_teste: <drive_id> } apaga o arquivinho depois
+    if (pedido?.teste_envio) {
+      const { data: c } = await db.from("conteudos").select("*").eq("id", String(pedido.teste_envio)).maybeSingle();
+      if (!c) return json({ ok: false, erro: "conteúdo não encontrado" });
+      const p = await pastaDoConteudo(c);
+      const r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,parents", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await tokenDeAcesso()}`, "Content-Type": "application/json; charset=UTF-8",
+          "X-Upload-Content-Type": "text/plain", "X-Upload-Content-Length": "26", Origin: "https://paulaandradee.github.io" },
+        body: JSON.stringify({ name: "teste-do-painel.txt", parents: [p.ids[0].id] }),
+      });
+      return json({ ok: r.ok, url: r.headers.get("location") });
+    }
+    if (pedido?.apagar_teste) {
+      const g = await google(`/files/${encodeURIComponent(String(pedido.apagar_teste))}?fields=name`);
+      if (g.j?.name !== "teste-do-painel.txt") return json({ ok: false, erro: "não é o arquivo de teste" });
+      const r = await fetch(`${API}/files/${encodeURIComponent(String(pedido.apagar_teste))}`, { method: "DELETE", headers: { Authorization: `Bearer ${await tokenDeAcesso()}` } });
+      return json({ ok: r.ok });
+    }
     if (pedido?.link_para && (await ehAdmin(String(pedido.link_para)))) {
       const estado = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
       await db.from("drive_estados").insert({ estado, user_id: String(pedido.link_para) });
