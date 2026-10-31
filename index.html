@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Seu Painel</title>
-  <link rel="stylesheet" href="css/estilo.css?v=20261031f">
+  <link rel="stylesheet" href="css/estilo.css?v=20261031g">
 </head>
 <body>
 
@@ -60,9 +60,12 @@
       <a class="menu-item" href="#inicio" data-rota="inicio" title="Início"><span data-icone="casa"></span> <span class="txt">Início</span></a>
       <a class="menu-item" href="#calendario" data-rota="calendario" title="Calendário"><span data-icone="calendario"></span> <span class="txt">Calendário</span></a>
       <a class="menu-item" href="#producao" data-rota="producao" id="menu-producao" title="Produção de Conteúdo" hidden><span data-icone="grade"></span> <span class="txt">Produção</span></a>
-      <a class="menu-item" href="#drive" data-rota="drive" id="menu-drive" title="Drive e Arquivos" hidden><span data-icone="arquivo"></span> <span class="txt">Drive e Arquivos</span></a>
+      <a class="menu-item" href="#estrategia" data-rota="estrategia" id="menu-estrategia" title="Estratégia Editorial" hidden><span data-icone="bussola"></span> <span class="txt">Estratégia Editorial</span></a>
       <a class="menu-item" href="#instagram" data-rota="instagram" id="menu-instagram" title="Instagram"><span data-icone="instagram"></span> <span class="txt">Instagram</span></a>
+      <a class="menu-item" href="#drive" data-rota="drive" id="menu-drive" title="Drive e Arquivos" hidden><span data-icone="arquivo"></span> <span class="txt">Drive e Arquivos</span></a>
       <a class="menu-item" href="#formacao" data-rota="formacao" id="menu-formacao" title="Formação Sebrae" hidden><span data-icone="capelo"></span> <span class="txt">Formação Sebrae</span></a>
+      <a class="menu-item" href="#laboratorio" data-rota="laboratorio" id="menu-laboratorio" title="Laboratório de Experimentos" hidden><span data-icone="frasco"></span> <span class="txt">Laboratório</span></a>
+      <a class="menu-item" href="#portfolio" data-rota="portfolio" id="menu-portfolio" title="Portfólio" hidden><span data-icone="pasta"></span> <span class="txt">Portfólio</span></a>
       <a class="menu-item" href="#acessos" data-rota="acessos" id="menu-acessos" title="Contas e acessos" hidden><span data-icone="cadeado"></span> <span class="txt">Contas e acessos</span></a>
       <!-- Atalhos externos: abrem numa aba nova -->
       <span class="menu-grupo so-equipe">Atalhos</span>
@@ -141,6 +144,39 @@
         </div>
       </div>
       <div id="drive-corpo"></div>
+    </section>
+
+    <!-- ESTRATÉGIA EDITORIAL (contas com Produção; a expert só vê) -->
+    <section class="secao" id="secao-estrategia" hidden>
+      <div class="cabecalho">
+        <div>
+          <h1 class="titulo">🧭 Estratégia Editorial</h1>
+          <p class="texto-2" style="margin:4px 0 0">Posicionamento, pilares, identidade e o que o calendário está cumprindo.</p>
+        </div>
+      </div>
+      <div id="est-corpo"></div>
+    </section>
+
+    <!-- LABORATÓRIO (equipe das contas com Produção) -->
+    <section class="secao" id="secao-laboratorio" hidden>
+      <div class="cabecalho">
+        <div>
+          <h1 class="titulo">🧪 Laboratório de Experimentos</h1>
+          <p class="texto-2" style="margin:4px 0 0">Hipóteses testadas com os números reais dos posts. Resultado e conclusão são seus.</p>
+        </div>
+      </div>
+      <div id="lab-corpo"></div>
+    </section>
+
+    <!-- PORTFÓLIO (só a administradora) -->
+    <section class="secao" id="secao-portfolio" hidden>
+      <div class="cabecalho">
+        <div>
+          <h1 class="titulo">💼 Portfólio</h1>
+          <p class="texto-2" style="margin:4px 0 0">Estudos de caso com o seu texto e os dados reais do painel.</p>
+        </div>
+      </div>
+      <div id="port-corpo"></div>
     </section>
 
     <!-- FORMAÇÃO (só a administradora) -->
@@ -328,19 +364,22 @@
 
 <!-- Cliente oficial do Supabase (se não carregar, o modo local continua funcionando) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=20261031f"></script>
-<script src="js/app.js?v=20261031f"></script>
-<script src="js/editor.js?v=20261031f"></script>
-<script src="js/interacoes.js?v=20261031f"></script>
-<script src="js/conversas.js?v=20261031f"></script>
-<script src="js/desempenho.js?v=20261031f"></script>
-<script src="js/relatorio.js?v=20261031f"></script>
-<script src="js/drive.js?v=20261031f"></script>
-<script src="js/ficha.js?v=20261031f"></script>
-<script src="js/calendario.js?v=20261031f"></script>
-<script src="js/producao.js?v=20261031f"></script>
-<script src="js/formacao.js?v=20261031f"></script>
-<script src="js/analises.js?v=20261031f"></script>
-<script src="js/acessos.js?v=20261031f"></script>
+<script src="js/config.js?v=20261031g"></script>
+<script src="js/app.js?v=20261031g"></script>
+<script src="js/editor.js?v=20261031g"></script>
+<script src="js/interacoes.js?v=20261031g"></script>
+<script src="js/conversas.js?v=20261031g"></script>
+<script src="js/desempenho.js?v=20261031g"></script>
+<script src="js/relatorio.js?v=20261031g"></script>
+<script src="js/drive.js?v=20261031g"></script>
+<script src="js/ficha.js?v=20261031g"></script>
+<script src="js/calendario.js?v=20261031g"></script>
+<script src="js/producao.js?v=20261031g"></script>
+<script src="js/formacao.js?v=20261031g"></script>
+<script src="js/estrategia.js?v=20261031g"></script>
+<script src="js/laboratorio.js?v=20261031g"></script>
+<script src="js/portfolio.js?v=20261031g"></script>
+<script src="js/analises.js?v=20261031g"></script>
+<script src="js/acessos.js?v=20261031g"></script>
 </body>
 </html>

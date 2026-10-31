@@ -521,3 +521,24 @@ quem colabora nunca vê DMs, leads, conversas, automações, Drive geral nem a F
 - No Início, todo mundo com Produção vê **Minhas tarefas** (atrasadas e próximos 14 dias), com
   "✓ Feita" (pensado para o celular).
 - O acesso "Só visualização" (painel_leitores) continua igual.
+
+## Estratégia Editorial, Laboratório e Portfólio
+
+Rode `supabase/sql/27_estrategia_lab_portfolio.sql`. Os dados do Tudo se Restaura (estratégia,
+experimentos A a D e o estudo de caso) foram cadastrados direto no banco, fora do repositório.
+
+- **Estratégia Editorial** (contas com Produção; a expert só lê, o editor não vê):
+  posicionamento, público, tom de voz, perfil (bio proposta × aplicada, destaques, fixados),
+  pilares com meta de distribuição comparada ao que está planejado no Calendário no mês,
+  meta autoral × remix, identidade visual DO INSTAGRAM (não muda o painel), diagnóstico
+  inicial dos prints comparado com o relatório mensal da Meta, e campanhas. Cada bloco tem
+  "Editar". Os pilares cadastrados aqui viram as sugestões do campo Pilar da ficha.
+- **Laboratório** (só a equipe): experimentos com objetivo, hipótese, período, métrica e forma
+  de comparar (autoral × remix, formato, campanha × demais, grupos A/B). Os números vêm das
+  métricas dos posts ligados às fichas; sem post ligado, sem número. Resultado, interpretação e
+  conclusão são escritos por você ("Copiar para o resultado" só cola os números).
+- **Portfólio** (só a administradora): estudo de caso em 15 seções. Cada uma tem o seu texto
+  (salva sozinho) e, quando existe, um quadro "Do painel" com dados reais: diagnóstico,
+  autoria dos conteúdos (produção própria, remix, curadoria, terceiros, IA), campanhas,
+  automações, relatórios mensais, experimentos e a Formação aplicada (cursos e competências).
+  Imprimir / PDF gera a versão limpa.

@@ -40,6 +40,9 @@ const ICONES = {
   notion: '<path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4M8 12h8M8 16h5"/>',
   cadeado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   jardim: '<path d="M12 21v-8"/><path d="M12 17c-2.6-.2-4-1.4-4.6-3.2M12 16c2.4-.2 3.8-1.2 4.4-2.8"/><path d="M6.5 4c0 5 1.2 9 5.5 9s5.5-4 5.5-9c-1.6.5-2.8 1.3-3.4 2.4C13.4 5 12.8 4 12 3.2 11.2 4 10.6 5 10 6.4 9.4 5.3 8.1 4.5 6.5 4z"/>',
+  bussola: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>',
+  frasco: '<path d="M9 3h6M10 3v6L4.5 18.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7 15h10"/>',
+  pasta: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
   capelo: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5M22 9v6"/>',
   pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
 };
@@ -425,6 +428,12 @@ async function prepararContas() {
   $("#menu-producao").hidden = !App.producao;
   App.drive = App.remoto && App.contas.some((c) => c.recursos?.includes("drive") && !App.colab.has(c.id));
   $("#menu-drive").hidden = !App.drive;
+  const comProducao = App.remoto ? App.contas.filter((c) => c.recursos?.includes("producao")) : [];
+  App.verEstrategia = comProducao.some((c) => papelNa(c.id) !== "editor"); // a expert só lê
+  App.verLaboratorio = comProducao.some((c) => !papelNa(c.id));            // só a equipe
+  $("#menu-estrategia").hidden = !App.verEstrategia;
+  $("#menu-laboratorio").hidden = !App.verLaboratorio;
+  $("#menu-portfolio").hidden = !App.admin;
   document.body.classList.toggle("leitor", App.leitor); // esconde os botões de alterar (.so-edicao)
   renderSeletorConta();
 }
@@ -469,7 +478,8 @@ let abaInstagram = memoria.ler("aba_instagram", "automacoes");
 function navegar() {
   if (!App.usuario) return;
   const rota = (location.hash || "#inicio").slice(1).split("?")[0]; // "#drive?drive=conectado" = volta do Google
-  const rotas = ["inicio", "calendario"].concat(App.verInstagram ? ["instagram"] : [], App.producao ? ["producao"] : [], App.drive ? ["drive"] : [], App.admin ? ["formacao", "acessos"] : []);
+  const rotas = ["inicio", "calendario"].concat(App.verInstagram ? ["instagram"] : [], App.producao ? ["producao"] : [], App.drive ? ["drive"] : [],
+    App.verEstrategia ? ["estrategia"] : [], App.verLaboratorio ? ["laboratorio"] : [], App.admin ? ["formacao", "portfolio", "acessos"] : []);
   const valida = rotas.includes(rota) ? rota : "inicio";
   $$(".secao").forEach((s) => (s.hidden = s.id !== `secao-${valida}`));
   $$(".menu-item[data-rota]").forEach((m) => m.classList.toggle("ativo", m.dataset.rota === valida));
@@ -479,6 +489,9 @@ function navegar() {
   if (valida === "instagram" && App.conta) { trocarAba(abaInstagram); carregarStatusIg(); }
   if (valida === "producao") window.Producao.carregar();
   if (valida === "drive") window.Drive.carregar();
+  if (valida === "estrategia") window.Estrategia.carregar();
+  if (valida === "laboratorio") window.Laboratorio.carregar();
+  if (valida === "portfolio") window.Portfolio.carregar(); else window.Portfolio?.parar();
   if (valida === "formacao") window.Formacao.carregar(); else window.Formacao?.parar();
   if (valida === "acessos") window.Acessos.carregar();
 }

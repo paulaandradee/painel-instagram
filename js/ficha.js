@@ -84,6 +84,7 @@
     let novo = !c.id;
     let aba = abaInicial;
     let membros = [], campanhas = [], tarefas = [], comentarios = [], historico = null;
+    let pilares = PILARES; // os da Estratégia da conta, quando houver
     let metricaPost;      // undefined = não lido; null = sem métricas
     const drive = { status: null, arquivos: [], enviando: null }; // aba Arquivos (drive.js)
     const comDrive = () => App.remoto && !!window.Drive?.ligado(c.conta_id);
@@ -118,11 +119,12 @@
     let sujo = false;
 
     try {
-      const [m, k] = await Promise.all([
+      const [m, k, p] = await Promise.all([
         sb.rpc("membros_da_conta", { p_conta: c.conta_id }),
         sb.from("campanhas").select("id, nome").eq("conta_id", c.conta_id).order("criado_em"),
+        window.Estrategia ? window.Estrategia.pilaresDe(c.conta_id) : [],
       ]);
-      membros = m.data ?? []; campanhas = k.data ?? [];
+      membros = m.data ?? []; campanhas = k.data ?? []; if (p?.length) pilares = p;
     } catch { /* segue sem as listas */ }
     const emailDe = (id) => membros.find((p) => p.user_id === id)?.email ?? (id ? "alguém" : "-");
     const quemCurto = (id) => emailDe(id).split("@")[0];
@@ -170,7 +172,7 @@
         </div>
         <div class="cal-form-grade">
           <div class="campo"><label class="rotulo" for="fi-pilar">Pilar editorial</label>
-            <input class="input" id="fi-pilar" list="fi-pilares" maxlength="80" value="${esc(c.pilar)}"><datalist id="fi-pilares">${PILARES.map((p) => `<option value="${esc(p)}">`).join("")}</datalist></div>
+            <input class="input" id="fi-pilar" list="fi-pilares" maxlength="80" value="${esc(c.pilar)}"><datalist id="fi-pilares">${pilares.map((p) => `<option value="${esc(p)}">`).join("")}</datalist></div>
           <div class="campo"><label class="rotulo" for="fi-objetivo">Objetivo</label><input class="input" id="fi-objetivo" maxlength="200" value="${esc(c.objetivo)}"></div>
         </div>
         <span class="rotulo">Responsáveis</span>
