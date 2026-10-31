@@ -99,7 +99,9 @@
   }
 
   async function carregar() {
-    const alvo = $("#aba-relatorio");
+    let alvo = $("#aba-relatorio");
+    // contas com Relatórios de desempenho: troca Desempenho / Atendimentos (desempenho.js)
+    if (window.Desempenho?.ativo()) { alvo = window.Desempenho.montar(alvo, carregar); if (!alvo) return; }
     if (!App.remoto) {
       alvo.innerHTML = `<div class="cartao vazio"><div class="vazio-icone" data-icone="grafico"></div>
         <h2 class="subtitulo">Relatório de atendimentos</h2><p>Precisa do Supabase conectado (veja o LEIA-ME).</p></div>`;

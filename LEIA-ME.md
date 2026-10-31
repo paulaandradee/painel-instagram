@@ -452,3 +452,23 @@ Publicação. Arrastar para outra coluna põe o conteúdo na primeira etapa dela
 se escolhe no próprio cartão. É o mesmo registro da ficha e do Calendário, e o histórico anota
 quem mudou. O cartão mostra tarefas feitas, atrasadas (borda vermelha), campanha e
 responsáveis. Filtros: busca, conta, campanha e "Em andamento" / "Com finalizados".
+
+## Relatórios de desempenho (contas com o recurso `relatorios`)
+
+Rode `supabase/sql/24_relatorios.sql` e publique a função `ig-relatorios` com `--no-verify-jwt`
+(ela confere a chave do robô ou o login). O agendamento `ig-relatorios` (todo dia 09:15 UTC =
+06h15 de Brasília) foi criado copiando o comando do `ig-scheduler`, com a mesma `x-sched-key`.
+
+- **Todo dia**: guarda os seguidores do dia (a Meta não dá o número do passado), o alcance e
+  os novos seguidores por dia e as métricas dos posts dos últimos 45 dias. Cada coleta fica
+  em `coletas`; se falhar, a aba avisa.
+- **Segunda**: relatório semanal da semana anterior (segunda a domingo). **Dia 1º**: mensal do
+  mês anterior. Ficam salvos, com histórico, e não precisam do painel aberto.
+- **Painel**: Instagram › Relatório › Desempenho. Totais com comparação ao período anterior,
+  seguidores, alcance por dia, melhores conteúdos, autoral × remix (pela ficha ligada ao post),
+  por formato, sugestões da IA (marcadas) e limitações. Exporta CSV e imprime/salva PDF.
+  "Gerar: semana passada / mês passado" refaz na hora.
+- **Limitações da Meta**: para Reels a API não dá seguidores por post nem visitas ao perfil;
+  retenção detalhada não é liberada; crescimento líquido só existe a partir da primeira coleta
+  (antes disso, só os novos seguidores, sem descontar quem saiu).
+- Refazer um período pela chave do robô: corpo `{"gerar":{"tipo":"mensal","inicio":"2026-10-01","fim":"2026-10-31"}}`.

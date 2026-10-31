@@ -71,6 +71,7 @@
     let novo = !c.id;
     let aba = abaInicial;
     let membros = [], campanhas = [], tarefas = [], comentarios = [], historico = null;
+    let metricaPost;      // undefined = não lido; null = sem métricas
     let sujo = false;
 
     try {
@@ -204,7 +205,20 @@
         <div class="linha so-edicao"><button type="button" class="btn btn-p" data-f="escolher-post"><span data-icone="instagram"></span> Escolher o post do Instagram</button>
           ${c.ig_media_id ? `<button type="button" class="btn btn-fantasma" data-f="desligar-post">Desligar o post</button>` : ""}</div>
         <div id="fi-posts"></div>
-        <p class="pequeno texto-2">O post é ligado por você, nunca pela data. As métricas do post (visualizações, alcance, salvamentos...) aparecem aqui quando o relatório de métricas estiver ligado.</p>`;
+        ${htmlMetricas()}
+        <p class="pequeno texto-2">O post é ligado por você, nunca pela data. As métricas vêm da coleta diária (Relatório › Desempenho).</p>`;
+    }
+
+    function htmlMetricas() {
+      if (!c.ig_media_id) return "";
+      if (metricaPost === undefined) return `<p class="pequeno texto-2">Carregando métricas...</p>`;
+      if (!metricaPost) return `<p class="pequeno texto-2">Ainda sem métricas para este post: aparecem depois da próxima coleta diária (06h15).</p>`;
+      const m = metricaPost;
+      const nn = (v) => (v == null ? "-" : Number(v).toLocaleString("pt-BR"));
+      const itens = [["Visualizações", m.views], ["Alcance", m.alcance], ["Curtidas", m.curtidas], ["Comentários", m.comentarios],
+        ["Compartilhamentos", m.compartilhamentos], ["Salvamentos", m.salvos], ["Seguidores pelo post", m.seguidores], ["Visitas ao perfil", m.visitas_perfil]];
+      return `<div class="fi-metricas">${itens.map(([r, v]) => `<div class="cartao kpi"><div class="numero">${nn(v)}</div><span class="kpi-rotulo">${r}</span></div>`).join("")}</div>
+        <p class="pequeno texto-2">${m.tempo_medio_s != null ? `Tempo médio assistido: <strong>${String(m.tempo_medio_s).replace(".", ",")}s</strong> · ` : ""}Atualizado em ${esc(quando(m.atualizado_em))}. "-" = a Meta não libera esse número para este tipo de post.</p>`;
     }
 
     function painelHistorico() {
@@ -286,7 +300,7 @@
       btn.disabled = false; btn.textContent = "Salvar";
       if (r.error) { console.warn(r.error); aviso("Não foi possível salvar agora.", "erro"); return false; }
       const eraNovo = novo;
-      c = r.data; novo = false; sujo = false; historico = null;
+      c = r.data; novo = false; sujo = false; historico = null; metricaPost = undefined;
       aviso(eraNovo ? "Conteúdo criado. Agora dá para criar as tarefas na aba Produção." : "Conteúdo salvo.", "ok");
       aoMudar?.();
       if (eraNovo) aba = "producao";
@@ -352,6 +366,11 @@
           const { data } = await sb.from("conteudo_historico").select("*").eq("conteudo_id", c.id).order("quando", { ascending: false }).limit(200);
           historico = data ?? [];
           if (aba === "historico") desenhar();
+        }
+        if (aba === "metricas" && c.ig_media_id && metricaPost === undefined) {
+          const { data } = await sb.from("metricas_posts").select("*").eq("conta_id", c.conta_id).eq("media_id", c.ig_media_id).maybeSingle();
+          metricaPost = data ?? null;
+          if (aba === "metricas") desenhar();
         }
         return;
       }

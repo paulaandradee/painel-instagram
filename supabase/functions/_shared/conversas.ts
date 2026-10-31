@@ -208,7 +208,7 @@ async function pedirAoModelo(modelo: string, sistema: string, pedido: string, js
   return limpo || null;
 }
 
-async function chamarGemini(sistema: string, pedido: string, json = false): Promise<string | null> {
+export async function chamarGemini(sistema: string, pedido: string, json = false): Promise<string | null> {
   if (!GEMINI_API_KEY) { console.warn("[sugestão] falta o secret GEMINI_API_KEY"); motivoFalha = "erro"; return null; }
   motivoFalha = null;
   const lista = await modelos();

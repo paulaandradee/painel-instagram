@@ -804,3 +804,35 @@ details.avancado .grade2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8
   .pd-quadro { grid-template-columns: minmax(0, 1fr); overflow-x: visible; }
   .pd-coluna { min-height: 0; }
 }
+
+/* ---------- Relatório › Desempenho (desempenho.js) ---------- */
+.rel-modo { margin-bottom: 16px; }
+.dsp-coleta { margin: 0 0 10px; }
+.dsp-acoes { margin-top: 10px; }
+.dsp-cabeca { padding: 16px 18px; }
+.dsp-avisos { margin: 10px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--texto-2); }
+.dsp-sec { margin: 22px 0 10px; }
+.dsp-var { font-size: 11.5px; font-weight: 650; margin-left: 4px; white-space: nowrap; }
+.dsp-var.sobe { color: var(--sucesso); }
+.dsp-var.desce { color: var(--erro); }
+.dsp-tabela td.num, .dsp-tabela th { text-align: right; white-space: nowrap; }
+.dsp-tabela th:first-child, .dsp-tabela th:nth-child(2), .dsp-tabela td:first-child { text-align: left; }
+.dsp-post { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsp-ia { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.dsp-todos { margin-top: 22px; }
+.dsp-todos summary { cursor: pointer; }
+.dsp-limites { margin-top: 18px; }
+.fi-metricas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0 6px; }
+.fi-metricas .kpi { padding: 10px 12px; }
+.fi-metricas .numero { font-size: 19px; }
+@media (max-width: 760px) {
+  .dsp-ia, .fi-metricas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media print {
+  .lateral, .topo-mobile, .abas, .rel-modo, .dsp-acoes, #ig-contas, .pilulas-status, .toasts, .dsp-coleta, #aviso-modo-local { display: none !important; }
+  .conteudo { margin: 0 !important; padding: 0 !important; max-width: none !important; }
+  .dsp-todos { display: block; }
+  .dsp-todos > *:not(summary) { display: block !important; }
+  .cartao { box-shadow: none !important; break-inside: avoid; }
+  body { background: #fff !important; }
+}
