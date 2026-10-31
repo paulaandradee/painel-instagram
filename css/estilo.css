@@ -727,3 +727,57 @@ details.avancado .grade2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8
   .fm-duas { grid-template-columns: minmax(0, 1fr); }
   .fm-inicio-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------- Calendário: visões, tarefas e campanhas ---------- */
+.cal-novos { margin-left: auto; gap: 8px; }
+.cal-filtros { margin: 4px 0 10px; }
+.cal-atrasadas { color: var(--erro); }
+.cal-layout.sem-ideias { grid-template-columns: minmax(0, 1fr); }
+.cal-vista-semana .cal-dia { min-height: 340px; }
+.cal-vista-dia, .cal-vista-lista { padding: 14px 16px; }
+.cal-vista-dia .cal-card, .cal-vista-lista .cal-card { font-size: 13px; padding: 7px 10px; }
+.cal-vista-lista .cal-agenda-dia { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; align-items: start; }
+.cal-card.cal-tarefa { border-left-style: dashed; background: var(--superficie); }
+.cal-card.cal-tarefa .cal-card-tema { font-weight: 550; }
+.cal-card.cal-tarefa.st-feita { opacity: .6; }
+.cal-card.cal-tarefa.tp-gravacao, .cal-card.cal-tarefa.tp-edicao { border-left-color: var(--destaque); }
+.cal-card.cal-tarefa.tp-aprovacao { border-left-color: var(--sucesso); }
+.cal-card.cal-tarefa.tp-compromisso { border-left-style: solid; border-left-color: var(--texto-2); }
+.cal-card.cal-campanha { border-left-color: var(--atencao); background: var(--atencao-suave); cursor: pointer; }
+@media (max-width: 760px) {
+  .cal-novos { margin-left: 0; }
+  .cal-vista-lista .cal-agenda-dia { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+
+/* ---------- Ficha de conteúdo (ficha.js) ---------- */
+.modal-ficha { max-width: 860px; max-height: calc(100vh - 32px); overflow-y: auto; padding: 0; }
+.fi-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 18px 20px 8px; }
+.fi-topo .subtitulo { margin: 2px 0 6px; }
+.fi-abas { padding: 0 16px; margin-bottom: 4px; gap: 4px; }
+.fi-abas .aba { padding: 6px 12px; font-size: 13px; }
+.fi-corpo { padding: 8px 20px 4px; min-height: 280px; }
+.fi-rodape {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 20px;
+  border-top: 1px solid var(--borda); position: sticky; bottom: 0; background: var(--superficie);
+}
+.fi-tarefas { display: flex; flex-direction: column; gap: 6px; }
+.fi-tarefa {
+  display: grid; grid-template-columns: 140px minmax(0, 1fr) 140px 96px 130px 110px 34px; gap: 6px; align-items: center;
+}
+.fi-tarefa .input, .fi-tarefa .select { padding: 6px 8px; font-size: 13px; }
+.fi-tarefa.st-feita [data-t=titulo] { text-decoration: line-through; color: var(--texto-2); }
+.fi-comentarios { display: flex; flex-direction: column; gap: 8px; }
+.fi-comentario { padding: 9px 12px; border: 1px solid var(--borda); border-radius: var(--raio-p); background: var(--superficie-2); }
+.fi-comentario.tp-ajuste { border-color: var(--atencao); background: var(--atencao-suave); }
+.fi-comentario.tp-aprovacao { border-color: var(--sucesso); background: var(--sucesso-suave); }
+.fi-historico { display: flex; flex-direction: column; }
+.fi-hist { display: flex; flex-direction: column; gap: 1px; padding: 7px 0; border-bottom: 1px solid var(--borda); font-size: 13.5px; }
+.fi-posts { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin: 10px 0; }
+.fi-post { border: 1px solid var(--borda); border-radius: var(--raio-p); background: var(--superficie); padding: 4px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; align-items: center; color: inherit; font: inherit; }
+.fi-post:hover { border-color: var(--destaque); }
+.fi-post img, .fi-post > span:first-child { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; display: grid; place-items: center; background: var(--superficie-2); }
+@media (max-width: 760px) {
+  .modal-ficha { max-height: calc(100vh - 16px); }
+  .fi-tarefa { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 8px 0; border-bottom: 1px solid var(--borda); }
+  .fi-tarefa [data-t=titulo] { grid-column: 1 / -1; }
+}

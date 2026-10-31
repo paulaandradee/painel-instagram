@@ -428,3 +428,18 @@ cursos, links e o cronograma **não ficam no repositório**: são cadastrados di
 
 Também cria `ig_contas.recursos` (vazio). Os próximos recursos (Produção, Drive...) serão
 ligados só nas contas que tiverem o nome deles nessa lista.
+
+## Ficha de conteúdo, tarefas e campanhas (contas com Produção)
+
+Rode `supabase/sql/23_ficha_conteudo.sql`. Só as contas com `producao` em `ig_contas.recursos`
+usam isso (hoje, só @tudoserestaura). As outras seguem com o formulário simples, sem mudança.
+
+- **Ficha** (clique num conteúdo): Visão Geral, Roteiro, Produção (tarefas), Arquivos (link da
+  pasta do Drive), Aprovação (enviar, aprovar, pedir ajustes e comentários), Métricas (o post
+  do Instagram é escolhido por você, nunca pela data) e Histórico. O histórico é escrito pelo
+  banco: quem mudou o quê e quando.
+- **Calendário**: visões Mês, Semana, Dia e Lista; filtros Tudo, Conteúdos, Estudos, Gravações,
+  Edições, Aprovações, Campanhas e Compromissos. Arrastar muda a data do conteúdo ou da tarefa
+  (as tarefas do conteúdo não mudam juntas). Clicar no número do dia abre o dia.
+- **Compromissos**: botão "Compromisso" cria uma tarefa fora de um conteúdo.
+- Mudar uma data no painel nunca mexe em nada já agendado na Meta.

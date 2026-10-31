@@ -120,7 +120,7 @@ const Dados = {
   // Contas que a pessoa pode ver (o banco só devolve as liberadas pra ela)
   async contas() {
     if (!App.remoto) return [{ id: "local", username: "sua_conta", nome: "Conta de teste" }];
-    const { data } = await sb.from("ig_contas").select("id, username, nome, ativo").eq("ativo", true).order("criado_em");
+    const { data } = await sb.from("ig_contas").select("id, username, nome, ativo, recursos").eq("ativo", true).order("criado_em");
     return data ?? [];
   },
 
