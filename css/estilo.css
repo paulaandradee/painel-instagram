@@ -836,3 +836,14 @@ details.avancado .grade2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8
   .cartao { box-shadow: none !important; break-inside: avoid; }
   body { background: #fff !important; }
 }
+
+/* ---------- Drive (drive.js) ---------- */
+.drv-envio { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; border: 1px dashed var(--borda); border-radius: var(--raio-p); background: var(--superficie-2); margin-bottom: 10px; }
+.drv-envio .select { width: auto; }
+.drv-barra { height: 8px; border-radius: 999px; background: var(--superficie-2); overflow: hidden; margin: 4px 0; }
+.drv-barra span { display: block; height: 100%; background: var(--destaque); transition: width .2s; }
+.drv-grupo { margin-top: 10px; }
+.drv-arq { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--borda); }
+.drv-nome { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fm-barra.drv-cheio span { background: var(--erro); }
+@media (max-width: 760px) { .drv-arq { grid-template-columns: minmax(0, 1fr) auto; } .drv-arq .pequeno { grid-column: 1 / -1; grid-row: 2; } }

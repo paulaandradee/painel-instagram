@@ -402,6 +402,8 @@ async function prepararContas() {
   $("#menu-formacao").hidden = !App.admin;
   App.producao = App.remoto && App.contas.some((c) => c.recursos?.includes("producao"));
   $("#menu-producao").hidden = !App.producao;
+  App.drive = App.remoto && App.contas.some((c) => c.recursos?.includes("drive"));
+  $("#menu-drive").hidden = !App.drive;
   document.body.classList.toggle("leitor", App.leitor); // esconde os botões de alterar (.so-edicao)
   renderSeletorConta();
 }
@@ -445,8 +447,8 @@ let abaInstagram = memoria.ler("aba_instagram", "automacoes");
 
 function navegar() {
   if (!App.usuario) return;
-  const rota = (location.hash || "#inicio").slice(1);
-  const rotas = ["inicio", "calendario", "instagram"].concat(App.producao ? ["producao"] : [], App.admin ? ["formacao", "acessos"] : []);
+  const rota = (location.hash || "#inicio").slice(1).split("?")[0]; // "#drive?drive=conectado" = volta do Google
+  const rotas = ["inicio", "calendario", "instagram"].concat(App.producao ? ["producao"] : [], App.drive ? ["drive"] : [], App.admin ? ["formacao", "acessos"] : []);
   const valida = rotas.includes(rota) ? rota : "inicio";
   $$(".secao").forEach((s) => (s.hidden = s.id !== `secao-${valida}`));
   $$(".menu-item[data-rota]").forEach((m) => m.classList.toggle("ativo", m.dataset.rota === valida));
@@ -455,6 +457,7 @@ function navegar() {
   if (valida === "calendario") window.Calendario.carregar(); else window.Calendario?.parar();
   if (valida === "instagram" && App.conta) { trocarAba(abaInstagram); carregarStatusIg(); }
   if (valida === "producao") window.Producao.carregar();
+  if (valida === "drive") window.Drive.carregar();
   if (valida === "formacao") window.Formacao.carregar(); else window.Formacao?.parar();
   if (valida === "acessos") window.Acessos.carregar();
 }

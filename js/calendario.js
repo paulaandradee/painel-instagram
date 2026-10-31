@@ -158,6 +158,7 @@
   async function mudarData(c, data) {
     if (!App.remoto) return salvar({ ...c, data });
     const { error } = await sb.from("conteudos").update({ data }).eq("id", c.id);
+    if (!error) window.Drive?.sincronizar({ ...c, data }); // pasta do Drive vai para o mês novo
     if (error) throw error;
   }
 

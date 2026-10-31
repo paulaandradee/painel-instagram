@@ -72,6 +72,36 @@
     let aba = abaInicial;
     let membros = [], campanhas = [], tarefas = [], comentarios = [], historico = null;
     let metricaPost;      // undefined = não lido; null = sem métricas
+    const drive = { status: null, arquivos: [], enviando: null }; // aba Arquivos (drive.js)
+    const comDrive = () => App.remoto && !!window.Drive?.ligado(c.conta_id);
+
+    async function lerDrive() {
+      const [s, arqs, atual] = await Promise.all([
+        window.Drive.status(), window.Drive.arquivosDe(c.id),
+        sb.from("conteudos").select("drive_pasta_url").eq("id", c.id).maybeSingle(),
+      ]);
+      drive.status = s; drive.arquivos = arqs;
+      if (atual.data) c.drive_pasta_url = atual.data.drive_pasta_url;
+      if (aba === "arquivos") { lerFormulario(); desenhar(); }
+    }
+
+    async function enviarArquivos(lista) {
+      const sub = Number(f("#drv-sub")?.value || 2);
+      for (const arq of lista) {
+        drive.enviando = { nome: arq.name, p: 0 };
+        if (aba === "arquivos") { lerFormulario(); desenhar(); }
+        try {
+          await window.Drive.enviar(c.id, sub, arq, (p) => {
+            drive.enviando = { nome: arq.name, p };
+            const el = f("#drv-progresso");
+            if (el) el.innerHTML = `<div class="drv-barra"><span style="width:${Math.round(p * 100)}%"></span></div><p class="pequeno">${esc(arq.name)}: ${Math.round(p * 100)}%</p>`;
+          });
+          aviso(`${arq.name} enviado ao Drive.`, "ok");
+        } catch (err) { aviso(`${arq.name}: ${err.message}`, "erro"); }
+      }
+      drive.enviando = null;
+      await lerDrive();
+    }
     let sujo = false;
 
     try {
@@ -168,8 +198,12 @@
 
     function painelArquivos() {
       const url = c.drive_pasta_url;
+      if (comDrive()) {
+        if (novo) return `<p class="texto-2 pequeno">Salve o conteúdo primeiro: a pasta no Drive é criada sozinha.</p>`;
+        return window.Drive.htmlFicha(c, drive.status, drive.arquivos, drive.enviando);
+      }
       return `
-        <div class="faixa faixa-info">${icone("info")}<span>A criação automática de pastas e o envio de arquivos para o Google Drive entram na etapa do Drive. Por enquanto, cole aqui o link da pasta.</span></div>
+        <div class="faixa faixa-info">${icone("info")}<span>O Google Drive não está ligado para esta conta. Cole aqui o link da pasta.</span></div>
         <div class="campo" style="margin-top:12px"><label class="rotulo" for="fi-drive_pasta_url">Pasta do Drive</label>
           <div class="linha"><input class="input" type="url" id="fi-drive_pasta_url" value="${esc(url)}" placeholder="https://drive.google.com/drive/folders/..." style="flex:1">
           ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Abrir ↗</a>` : ""}</div></div>`;
@@ -292,6 +326,8 @@
       ["titulo", "pilar", "objetivo", "briefing", "roteiro", "capa_texto", "legenda", "cta", "referencias", "drive_pasta_url", "link_publicacao", "notas"].forEach((k) => { linha[k] = linha[k] ?? ""; });
       linha.titulo = linha.titulo.trim();
       linha.tema = linha.titulo; // o calendário antigo mostra "tema"
+      if (comDrive()) delete linha.drive_pasta_url; // com Drive ligado, quem escreve o link é o servidor
+      const mudouPasta = !novo && (linha.data !== (item.data ?? null) || linha.titulo !== (item.titulo || item.tema || ""));
       const btn = $("button[type=submit]", form);
       btn.disabled = true; btn.textContent = "Salvando...";
       const r = novo
@@ -303,6 +339,9 @@
       c = r.data; novo = false; sujo = false; historico = null; metricaPost = undefined;
       aviso(eraNovo ? "Conteúdo criado. Agora dá para criar as tarefas na aba Produção." : "Conteúdo salvo.", "ok");
       aoMudar?.();
+      // pasta no Drive: cria para conteúdo novo; renomeia/move se mudou data ou título
+      if (comDrive() && (eraNovo || mudouPasta)) window.Drive.sincronizar(c, eraNovo).then(() => { if (aba === "arquivos") lerDrive(); });
+      item = { ...c };
       if (eraNovo) aba = "producao";
       desenhar();
       return true;
@@ -367,6 +406,7 @@
           historico = data ?? [];
           if (aba === "historico") desenhar();
         }
+        if (aba === "arquivos" && comDrive() && !novo) lerDrive();
         if (aba === "metricas" && c.ig_media_id && metricaPost === undefined) {
           const { data } = await sb.from("metricas_posts").select("*").eq("conta_id", c.conta_id).eq("media_id", c.ig_media_id).maybeSingle();
           metricaPost = data ?? null;
@@ -388,6 +428,21 @@
         const { error } = await sb.from("tarefas").delete().eq("id", id);
         if (error) return aviso("Não foi possível tirar a tarefa.", "erro");
         tarefas = tarefas.filter((t) => t.id !== id); historico = null; aoMudar?.(); lerFormulario(); desenhar();
+        return;
+      }
+      const drv = e.target.closest("[data-drv]");
+      if (drv) {
+        const qual = drv.dataset.drv;
+        if (qual === "copiar") return window.Drive.copiar(drv.dataset.link);
+        if (leitor) return;
+        if (qual === "escolher") return f("#drv-arquivo")?.click();
+        if (qual === "criar-pasta") {
+          drv.disabled = true; drv.textContent = "Criando a pasta...";
+          const r = await window.Drive.pasta(c.id);
+          if (!r?.ok) { aviso(r?.erro || "Não foi possível criar a pasta.", "erro"); drv.disabled = false; return; }
+          c.drive_pasta_url = r.link; aviso("Pasta criada no Drive.", "ok"); aoMudar?.();
+          return lerDrive();
+        }
         return;
       }
       const a = e.target.closest("[data-f]")?.dataset.f;
@@ -434,6 +489,8 @@
       if (e.target.id?.startsWith("fi-") && e.target.id !== "fi-novo-comentario") sujo = true;
     });
     fundo.addEventListener("change", (e) => {
+      if (e.target.id === "drv-arquivo") { const l = [...(e.target.files ?? [])]; e.target.value = ""; if (l.length && !leitor) enviarArquivos(l); return; }
+      if (e.target.id === "drv-sub") return;
       const linha = e.target.closest("[data-tarefa]");
       if (linha && e.target.dataset.t && e.target.dataset.t !== "titulo") {
         const k = e.target.dataset.t;

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Seu Painel</title>
-  <link rel="stylesheet" href="css/estilo.css?v=20261031d">
+  <link rel="stylesheet" href="css/estilo.css?v=20261031e">
 </head>
 <body>
 
@@ -60,6 +60,7 @@
       <a class="menu-item" href="#inicio" data-rota="inicio" title="Início"><span data-icone="casa"></span> <span class="txt">Início</span></a>
       <a class="menu-item" href="#calendario" data-rota="calendario" title="Calendário"><span data-icone="calendario"></span> <span class="txt">Calendário</span></a>
       <a class="menu-item" href="#producao" data-rota="producao" id="menu-producao" title="Produção de Conteúdo" hidden><span data-icone="grade"></span> <span class="txt">Produção</span></a>
+      <a class="menu-item" href="#drive" data-rota="drive" id="menu-drive" title="Drive e Arquivos" hidden><span data-icone="arquivo"></span> <span class="txt">Drive e Arquivos</span></a>
       <a class="menu-item" href="#instagram" data-rota="instagram" title="Instagram"><span data-icone="instagram"></span> <span class="txt">Instagram</span></a>
       <a class="menu-item" href="#formacao" data-rota="formacao" id="menu-formacao" title="Formação Sebrae" hidden><span data-icone="capelo"></span> <span class="txt">Formação Sebrae</span></a>
       <a class="menu-item" href="#acessos" data-rota="acessos" id="menu-acessos" title="Contas e acessos" hidden><span data-icone="cadeado"></span> <span class="txt">Contas e acessos</span></a>
@@ -127,6 +128,17 @@
         </div>
       </div>
       <div id="prod-corpo"></div>
+    </section>
+
+    <!-- DRIVE E ARQUIVOS (contas com o recurso drive) -->
+    <section class="secao" id="secao-drive" hidden>
+      <div class="cabecalho">
+        <div>
+          <h1 class="titulo">📁 Drive e Arquivos</h1>
+          <p class="texto-2" style="margin:4px 0 0">As pastas dos conteúdos no Google Drive, criadas e organizadas pelo painel.</p>
+        </div>
+      </div>
+      <div id="drive-corpo"></div>
     </section>
 
     <!-- FORMAÇÃO (só a administradora) -->
@@ -314,18 +326,19 @@
 
 <!-- Cliente oficial do Supabase (se não carregar, o modo local continua funcionando) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=20261031d"></script>
-<script src="js/app.js?v=20261031d"></script>
-<script src="js/editor.js?v=20261031d"></script>
-<script src="js/interacoes.js?v=20261031d"></script>
-<script src="js/conversas.js?v=20261031d"></script>
-<script src="js/desempenho.js?v=20261031d"></script>
-<script src="js/relatorio.js?v=20261031d"></script>
-<script src="js/ficha.js?v=20261031d"></script>
-<script src="js/calendario.js?v=20261031d"></script>
-<script src="js/producao.js?v=20261031d"></script>
-<script src="js/formacao.js?v=20261031d"></script>
-<script src="js/analises.js?v=20261031d"></script>
-<script src="js/acessos.js?v=20261031d"></script>
+<script src="js/config.js?v=20261031e"></script>
+<script src="js/app.js?v=20261031e"></script>
+<script src="js/editor.js?v=20261031e"></script>
+<script src="js/interacoes.js?v=20261031e"></script>
+<script src="js/conversas.js?v=20261031e"></script>
+<script src="js/desempenho.js?v=20261031e"></script>
+<script src="js/relatorio.js?v=20261031e"></script>
+<script src="js/drive.js?v=20261031e"></script>
+<script src="js/ficha.js?v=20261031e"></script>
+<script src="js/calendario.js?v=20261031e"></script>
+<script src="js/producao.js?v=20261031e"></script>
+<script src="js/formacao.js?v=20261031e"></script>
+<script src="js/analises.js?v=20261031e"></script>
+<script src="js/acessos.js?v=20261031e"></script>
 </body>
 </html>

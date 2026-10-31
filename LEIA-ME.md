@@ -472,3 +472,32 @@ Rode `supabase/sql/24_relatorios.sql` e publique a função `ig-relatorios` com 
   retenção detalhada não é liberada; crescimento líquido só existe a partir da primeira coleta
   (antes disso, só os novos seguidores, sem descontar quem saiu).
 - Refazer um período pela chave do robô: corpo `{"gerar":{"tipo":"mensal","inicio":"2026-10-01","fim":"2026-10-31"}}`.
+
+## Google Drive (contas com o recurso `drive`)
+
+Rode `supabase/sql/25_drive.sql` e publique a função `drive` com `--no-verify-jwt` (a volta do
+Google não tem login do painel; as outras ações conferem o login).
+
+**Configurar o Google (uma vez):**
+1. Em https://console.cloud.google.com, entre com a conta Google que vai guardar os arquivos e
+   crie um projeto (ex.: "Seu Painel").
+2. APIs e serviços › Biblioteca › **Google Drive API** › Ativar.
+3. Google Auth Platform (Tela de consentimento OAuth): nome do app, e-mail de suporte,
+   público **Externo**. Em Acesso a dados, adicione o escopo `.../auth/drive.file`.
+   Em Público-alvo, clique em **Publicar app** (fica "Em produção"). Em "Teste" o Google
+   corta a conexão a cada 7 dias.
+4. Clientes › Criar cliente › **Aplicativo da Web**. Em "URIs de redirecionamento
+   autorizados" coloque exatamente:
+   `https://lllcdkwkvqbszdawzhua.supabase.co/functions/v1/drive/callback`
+5. Copie o ID do cliente e a chave secreta para os secrets do Supabase (Edge Functions ›
+   Secrets): `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`. Não cole em lugar nenhum além disso.
+6. No painel: Drive e Arquivos › **Conectar Google Drive**. Depois, "Criar as pastas que faltam".
+
+**Como funciona:** permissão `drive.file`: o painel só enxerga o que ele mesmo criou. Pastas:
+CLIENTES SOCIAL MEDIA › conta › ano › mês › "DD-MM - Título" › 01 Briefing e Roteiro, 02
+Gravações, 03 Edição, 04 Aprovados, 05 Publicados (ideias sem data em "Ideias sem data").
+Cada pasta fica guardada pelo ID (`drive_pastas`): não duplica, e mudar a data ou o título
+renomeia ou move a pasta. O arquivo vai direto do navegador para o Google (até 2 GB), com
+nome de versão (Video_Bruto_01, Video_Edicao_V01, Video_Final_Aprovado...) e fica em
+`arquivos`. Nada fica público. O espaço é o do Google Drive da conta (15 GB grátis, dividido
+com Gmail e Fotos).
