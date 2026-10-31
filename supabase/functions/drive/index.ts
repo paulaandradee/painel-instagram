@@ -179,10 +179,22 @@ Deno.serve(async (req) => {
     });
     const j = await r.json().catch(() => ({}));
     const { count } = await db.from("drive_conexao").select("id", { count: "exact", head: true });
+    // { link_para: <user_id da administradora> }: devolve um link de autorização pronto (vale 15 min)
+    let link = null;
+    let pedido: any = {};
+    try { pedido = await req.json(); } catch { /* sem corpo */ }
+    if (pedido?.link_para && (await ehAdmin(String(pedido.link_para)))) {
+      const estado = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
+      await db.from("drive_estados").insert({ estado, user_id: String(pedido.link_para) });
+      link = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
+        client_id: CLIENT_ID, redirect_uri: CALLBACK, response_type: "code", access_type: "offline", prompt: "consent",
+        scope: "https://www.googleapis.com/auth/drive.file", state: estado, include_granted_scopes: "true",
+      })}`;
+    }
     return json({
       ok: true, tem_id: !!CLIENT_ID, tem_chave: !!CLIENT_SECRET, formato_id: /\.apps\.googleusercontent\.com$/.test(CLIENT_ID.trim()),
       espacos_no_secret: (Deno.env.get("GOOGLE_CLIENT_ID") ?? "") !== CLIENT_ID || (Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "") !== CLIENT_SECRET,
-      google: j.error ?? "?", google_detalhe: j.error_description ?? "", callback: CALLBACK, conectado: !!count,
+      google: j.error ?? "?", google_detalhe: j.error_description ?? "", callback: CALLBACK, conectado: !!count, link,
     });
   }
 
