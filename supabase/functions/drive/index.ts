@@ -19,11 +19,11 @@
 //         04-11 - Título / 01 - Briefing e Roteiro ... 05 - Publicados
 // Nada fica público: os links abrem só para quem tem acesso no Drive.
 // =====================================================================
-import { db } from "../_shared/ig.ts";
+import { checkSchedKey, db, json } from "../_shared/ig.ts";
 import { contaDoUsuario, CORS, ehAdmin, ehLeitor, reply, requireUser, SO_LEITURA } from "../_shared/painel.ts";
 
-const CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") ?? "";
-const CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "";
+const CLIENT_ID = (Deno.env.get("GOOGLE_CLIENT_ID") ?? "").trim(); // espaço colado junto quebra o login
+const CLIENT_SECRET = (Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "").trim();
 const CALLBACK = `${Deno.env.get("SUPABASE_URL")}/functions/v1/drive/callback`;
 const PAINEL = "https://paulaandradee.github.io/painel-instagram/";
 const ORIGENS_OK = [/^https:\/\/paulaandradee\.github\.io$/, /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/];
@@ -167,6 +167,24 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const url = new URL(req.url);
   if (req.method === "GET" && url.pathname.endsWith("/callback")) return callback(url);
+
+  // Diagnóstico (só com a chave do robô): as credenciais do Google estão certas?
+  // Um código falso devolve "invalid_grant" se o cliente existe e a chave confere,
+  // e "invalid_client" se o ID ou a chave secreta estão errados.
+  if (req.headers.get("x-sched-key")) {
+    if (!checkSchedKey(req)) return json({ ok: false }, 401);
+    const r = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ code: "teste", client_id: CLIENT_ID, client_secret: CLIENT_SECRET, redirect_uri: CALLBACK, grant_type: "authorization_code" }),
+    });
+    const j = await r.json().catch(() => ({}));
+    const { count } = await db.from("drive_conexao").select("id", { count: "exact", head: true });
+    return json({
+      ok: true, tem_id: !!CLIENT_ID, tem_chave: !!CLIENT_SECRET, formato_id: /\.apps\.googleusercontent\.com$/.test(CLIENT_ID.trim()),
+      espacos_no_secret: (Deno.env.get("GOOGLE_CLIENT_ID") ?? "") !== CLIENT_ID || (Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "") !== CLIENT_SECRET,
+      google: j.error ?? "?", google_detalhe: j.error_description ?? "", callback: CALLBACK, conectado: !!count,
+    });
+  }
 
   const userId = await requireUser(req);
   if (!userId) return reply({ ok: false, erro: "não autorizado" }, 401);
