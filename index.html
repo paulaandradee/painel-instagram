@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Seu Painel</title>
-  <link rel="stylesheet" href="css/estilo.css?v=20261028a">
+  <link rel="stylesheet" href="css/estilo.css?v=20261031a">
 </head>
 <body>
 
@@ -60,6 +60,7 @@
       <a class="menu-item" href="#inicio" data-rota="inicio" title="Início"><span data-icone="casa"></span> <span class="txt">Início</span></a>
       <a class="menu-item" href="#calendario" data-rota="calendario" title="Calendário"><span data-icone="calendario"></span> <span class="txt">Calendário</span></a>
       <a class="menu-item" href="#instagram" data-rota="instagram" title="Instagram"><span data-icone="instagram"></span> <span class="txt">Instagram</span></a>
+      <a class="menu-item" href="#formacao" data-rota="formacao" id="menu-formacao" title="Formação Sebrae" hidden><span data-icone="capelo"></span> <span class="txt">Formação Sebrae</span></a>
       <a class="menu-item" href="#acessos" data-rota="acessos" id="menu-acessos" title="Contas e acessos" hidden><span data-icone="cadeado"></span> <span class="txt">Contas e acessos</span></a>
       <!-- Atalhos externos: abrem numa aba nova -->
       <span class="menu-grupo">Atalhos</span>
@@ -92,6 +93,8 @@
         <div class="cartao kpi"><div class="numero" id="n-ativas">0</div><span class="kpi-rotulo">Automações ativas</span></div>
         <div class="cartao kpi"><div class="numero" id="n-dms">0</div><span class="kpi-rotulo">DMs enviadas (7 dias)</span></div>
       </div>
+      <!-- Formação: só a administradora vê (formacao.js) -->
+      <div id="inicio-formacao" style="margin-top:16px" hidden></div>
       <h2 class="subtitulo" style="margin:28px 0 12px">Atalhos</h2>
       <div class="linha">
         <a class="btn" href="#instagram"><span data-icone="instagram"></span> Abrir Instagram</a>
@@ -112,6 +115,17 @@
         </div>
       </div>
       <div id="cal-corpo"></div>
+    </section>
+
+    <!-- FORMAÇÃO (só a administradora) -->
+    <section class="secao" id="secao-formacao" hidden>
+      <div class="cabecalho">
+        <div>
+          <h1 class="titulo">🎓 Minha Formação | Social Media Estratégica</h1>
+          <p class="texto-2" style="margin:4px 0 0">Da teoria à prática: seis meses de desenvolvimento profissional em Social Media.</p>
+        </div>
+      </div>
+      <div id="form-corpo"></div>
     </section>
 
     <!-- INSTAGRAM -->
@@ -288,14 +302,15 @@
 
 <!-- Cliente oficial do Supabase (se não carregar, o modo local continua funcionando) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=20261028a"></script>
-<script src="js/app.js?v=20261028a"></script>
-<script src="js/editor.js?v=20261028a"></script>
-<script src="js/interacoes.js?v=20261028a"></script>
-<script src="js/conversas.js?v=20261028a"></script>
-<script src="js/relatorio.js?v=20261028a"></script>
-<script src="js/calendario.js?v=20261028a"></script>
-<script src="js/analises.js?v=20261028a"></script>
-<script src="js/acessos.js?v=20261028a"></script>
+<script src="js/config.js?v=20261031a"></script>
+<script src="js/app.js?v=20261031a"></script>
+<script src="js/editor.js?v=20261031a"></script>
+<script src="js/interacoes.js?v=20261031a"></script>
+<script src="js/conversas.js?v=20261031a"></script>
+<script src="js/relatorio.js?v=20261031a"></script>
+<script src="js/calendario.js?v=20261031a"></script>
+<script src="js/formacao.js?v=20261031a"></script>
+<script src="js/analises.js?v=20261031a"></script>
+<script src="js/acessos.js?v=20261031a"></script>
 </body>
 </html>

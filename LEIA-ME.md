@@ -409,3 +409,22 @@ Família" devolve a conversa para a caixa normal. Em Aguardando, o botão **✓ 
 a conversa como respondida sem enviar nada (por exemplo, quando a automação já respondeu). Ela
 volta para Aguardando só se a pessoa escrever de novo. No computador, o painel já abre a
 próxima conversa da lista.
+
+## Minha Formação (só a administradora)
+
+Rode `supabase/sql/22_formacao.sql`. Ele cria as tabelas `formacao_modulos`, `formacao_cursos`
+e `formacao_sessoes` e o armazenamento privado `formacao`, onde ficam os certificados. Cada
+linha tem dona e só ela vê; quem não é administradora não vê nada, nem no Calendário. Os
+cursos, links e o cronograma **não ficam no repositório**: são cadastrados direto no banco.
+
+- **Menu "Formação Sebrae"**: progresso, próxima sessão, sessões que passaram sem registro,
+  práticas pendentes e os 6 módulos. Cada curso tem Visão geral, Anotações, Exercícios,
+  Aplicação prática e Certificado, e salva sozinho enquanto você escreve.
+- **Progresso**: média de 4 partes que só mudam quando você confirma: sessões feitas, cursos
+  concluídos, certificados recebidos e práticas entregues. O tempo que passou não conta.
+- **Calendário**: as sessões aparecem em lilás, com o filtro Tudo / Conteúdos / Estudos.
+  Clique para abrir; arraste para outro dia para remarcar (o curso continua ligado).
+- **Início**: cartão com módulo atual, curso, próxima aula e prática pendente.
+
+Também cria `ig_contas.recursos` (vazio). Os próximos recursos (Produção, Drive...) serão
+ligados só nas contas que tiverem o nome deles nessa lista.

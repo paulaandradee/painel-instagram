@@ -40,6 +40,7 @@ const ICONES = {
   notion: '<path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4M8 12h8M8 16h5"/>',
   cadeado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   jardim: '<path d="M12 21v-8"/><path d="M12 17c-2.6-.2-4-1.4-4.6-3.2M12 16c2.4-.2 3.8-1.2 4.4-2.8"/><path d="M6.5 4c0 5 1.2 9 5.5 9s5.5-4 5.5-9c-1.6.5-2.8 1.3-3.4 2.4C13.4 5 12.8 4 12 3.2 11.2 4 10.6 5 10 6.4 9.4 5.3 8.1 4.5 6.5 4z"/>',
+  capelo: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5M22 9v6"/>',
   pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
 };
 function icone(nome) {
@@ -398,6 +399,7 @@ async function prepararContas() {
   const salva = memoria.ler("conta_atual", null);
   App.conta = App.contas.find((c) => c.id === salva) || App.contas[0] || null;
   $("#menu-acessos").hidden = !App.admin;
+  $("#menu-formacao").hidden = !App.admin;
   document.body.classList.toggle("leitor", App.leitor); // esconde os botões de alterar (.so-edicao)
   renderSeletorConta();
 }
@@ -442,7 +444,7 @@ let abaInstagram = memoria.ler("aba_instagram", "automacoes");
 function navegar() {
   if (!App.usuario) return;
   const rota = (location.hash || "#inicio").slice(1);
-  const rotas = ["inicio", "calendario", "instagram"].concat(App.admin ? ["acessos"] : []);
+  const rotas = ["inicio", "calendario", "instagram"].concat(App.admin ? ["formacao", "acessos"] : []);
   const valida = rotas.includes(rota) ? rota : "inicio";
   $$(".secao").forEach((s) => (s.hidden = s.id !== `secao-${valida}`));
   $$(".menu-item[data-rota]").forEach((m) => m.classList.toggle("ativo", m.dataset.rota === valida));
@@ -450,6 +452,7 @@ function navegar() {
   if (valida === "inicio") carregarInicio();
   if (valida === "calendario") window.Calendario.carregar(); else window.Calendario?.parar();
   if (valida === "instagram" && App.conta) { trocarAba(abaInstagram); carregarStatusIg(); }
+  if (valida === "formacao") window.Formacao.carregar(); else window.Formacao?.parar();
   if (valida === "acessos") window.Acessos.carregar();
 }
 
@@ -497,6 +500,7 @@ async function carregarInicio() {
   $("#n-leads").textContent = c.leads.toLocaleString("pt-BR");
   $("#n-ativas").textContent = c.ativas.toLocaleString("pt-BR");
   $("#n-dms").textContent = c.dms7.toLocaleString("pt-BR");
+  window.Formacao?.resumoInicio($("#inicio-formacao")); // só a administradora vê
 }
 
 // =====================================================================

@@ -5,6 +5,8 @@
 //   etapas (gravar, editar, legenda, publicado) e status
 // - etapas puxam o status: gravar+editar+legenda = Pronto; publicado = Publicado
 // - arrastar um conteúdo muda a data; soltar em "Ideias sem data" tira a data
+// - sessões de estudo da Formação (só a administradora vê): cor própria,
+//   filtro "Estudos", clique abre a sessão, arrastar remarca
 // - todo mundo da conta vê; a tela se atualiza sozinha a cada 30s
 // =====================================================================
 (function () {
@@ -21,9 +23,14 @@
 
   let mes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   let filtroConta = memoria.ler("cal_conta", "todas");
+  const TIPOS = { tudo: "Tudo", conteudos: "Conteúdos", estudos: "Estudos" };
+  let filtroTipo = memoria.ler("cal_tipo", "tudo");
   let itens = [];
+  let estudos = [];       // sessões da Formação no período
   let relogio = null;
-  let arrastando = null;
+  let arrastando = null;  // id do que está sendo arrastado
+  let arrastandoEstudo = false;
+  const temEstudos = () => App.remoto && App.admin;
 
   // ---------------- Datas ----------------
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -96,7 +103,9 @@
     }
     if (filtroConta !== "todas" && !contas().some((c) => c.id === filtroConta)) filtroConta = "todas";
     const { inicio, fim } = faixaDoMes();
-    try { itens = await ler(iso(inicio), iso(fim)); }
+    try {
+      [itens, estudos] = await Promise.all([ler(iso(inicio), iso(fim)), temEstudos() ? window.Formacao?.sessoesEntre(iso(inicio), iso(fim)) ?? [] : []]);
+    }
     catch (e) {
       console.warn(e);
       if (!silencioso) alvo.innerHTML = `<div class="faixa faixa-erro">${icone("info")}<span>Não foi possível ler o calendário. Rodou o 13_calendario.sql no Supabase?</span></div>`;
@@ -124,15 +133,30 @@
     </button>`;
   }
 
+  function cardEstudo(s) {
+    const hora = String(s.inicio).slice(0, 5);
+    const st = s.status === "feita" ? "✓ Feita" : s.status === "nao_feita" ? "Não feita" : "Estudo";
+    return `<button class="cal-card cal-estudo st-${esc(s.status)}" draggable="true" data-estudo="${esc(s.id)}"
+        aria-label="${esc(`Estudo, ${hora}: ${s.tema}. ${st}.`)}" title="${esc(`🎓 ${hora} · ${s.tema}`)}">
+      <span class="cal-card-tema">🎓 ${esc(s.tema)}</span>
+      <span class="cal-card-meta">${esc(hora)} · ${st}${s.flexivel ? " · flexível" : ""}</span>
+    </button>`;
+  }
+
   function render() {
     const alvo = $("#cal-corpo");
     const { inicio, fim } = faixaDoMes();
     const hoje = iso(new Date());
     const mesIso = iso(mes).slice(0, 7);
+    const verConteudos = filtroTipo !== "estudos";
+    const verEstudos = temEstudos() && filtroTipo !== "conteudos";
     const porDia = new Map();
-    itens.filter((c) => c.data).forEach((c) => { if (!porDia.has(c.data)) porDia.set(c.data, []); porDia.get(c.data).push(c); });
+    const por = (k, html) => { if (!porDia.has(k)) porDia.set(k, []); porDia.get(k).push(html); };
+    if (verEstudos) estudos.forEach((s) => por(s.data, cardEstudo(s)));
+    if (verConteudos) itens.filter((c) => c.data).forEach((c) => por(c.data, card(c)));
     const semData = itens.filter((c) => !c.data);
     const doMes = itens.filter((c) => c.data && c.data.startsWith(mesIso));
+    const estudosDoMes = estudos.filter((s) => s.data.startsWith(mesIso));
     const cont = (s) => doMes.filter((c) => c.status === s).length;
 
     // grade
@@ -143,7 +167,7 @@
       celulas += `<div class="cal-dia ${k.slice(0, 7) !== mesIso ? "fora" : ""} ${k === hoje ? "hoje" : ""}" data-dia="${k}">
         <div class="cal-dia-topo"><span class="cal-num">${d.getDate()}</span>
           <button class="cal-mais so-edicao" data-novo="${k}" aria-label="Novo conteúdo em ${d.toLocaleDateString("pt-BR")}" title="Novo conteúdo neste dia">+</button></div>
-        <div class="cal-itens">${lista.map(card).join("")}</div>
+        <div class="cal-itens">${lista.join("")}</div>
       </div>`;
     }
 
@@ -152,12 +176,15 @@
     const agenda = diasComItem.length
       ? diasComItem.map((k) => `<div class="cal-agenda-dia ${k === hoje ? "hoje" : ""}">
           <div class="cal-agenda-data">${esc(deIso(k).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }).replace(".", ""))}</div>
-          <div class="cal-itens">${porDia.get(k).map(card).join("")}</div></div>`).join("")
+          <div class="cal-itens">${porDia.get(k).join("")}</div></div>`).join("")
       : `<p class="texto-2 pequeno">Nada planejado neste mês ainda.</p>`;
 
     const seletor = variasContas() ? `<div class="segmentado" role="group" aria-label="Conta">
         <button class="${filtroConta === "todas" ? "ativo" : ""}" data-cal-conta="todas" aria-pressed="${filtroConta === "todas"}">Todas</button>
         ${contas().map((c) => `<button class="${filtroConta === c.id ? "ativo" : ""}" data-cal-conta="${esc(c.id)}" aria-pressed="${filtroConta === c.id}">@${esc(c.username || "conta")}</button>`).join("")}
+      </div>` : "";
+    const seletorTipo = temEstudos() ? `<div class="segmentado" role="group" aria-label="O que mostrar">
+        ${Object.entries(TIPOS).map(([k, n]) => `<button class="${filtroTipo === k ? "ativo" : ""}" data-cal-tipo="${k}" aria-pressed="${filtroTipo === k}">${n}</button>`).join("")}
       </div>` : "";
 
     alvo.innerHTML = `
@@ -169,9 +196,10 @@
           ${mesIso !== hoje.slice(0, 7) ? `<button class="btn btn-p" data-cal="hoje">Hoje</button>` : ""}
         </div>
         ${seletor}
+        ${seletorTipo}
         <button class="btn btn-primario so-edicao" data-novo=""><span data-icone="mais"></span> Novo conteúdo</button>
       </div>
-      <p class="pequeno texto-2 cal-resumo">Neste mês: <strong>${doMes.length}</strong> ${doMes.length === 1 ? "conteúdo" : "conteúdos"} · ${cont("a_fazer")} a fazer · ${cont("pronto")} ${cont("pronto") === 1 ? "pronto" : "prontos"} · ${cont("publicado")} ${cont("publicado") === 1 ? "publicado" : "publicados"}</p>
+      <p class="pequeno texto-2 cal-resumo">Neste mês: <strong>${doMes.length}</strong> ${doMes.length === 1 ? "conteúdo" : "conteúdos"} · ${cont("a_fazer")} a fazer · ${cont("pronto")} ${cont("pronto") === 1 ? "pronto" : "prontos"} · ${cont("publicado")} ${cont("publicado") === 1 ? "publicado" : "publicados"}${temEstudos() ? ` · <span class="cal-estudo-rotulo">🎓 ${estudosDoMes.length} ${estudosDoMes.length === 1 ? "sessão" : "sessões"} de estudo</span>` : ""}</p>
 
       <div class="cal-layout">
         <div class="cartao cal-mes">
@@ -301,6 +329,10 @@
   const raiz = $("#cal-corpo");
 
   raiz.addEventListener("click", (e) => {
+    const estudo = e.target.closest("[data-estudo]");
+    if (estudo) { const s = estudos.find((x) => x.id === estudo.dataset.estudo); if (s) window.Formacao?.abrirSessao(s, () => carregar(true)); return; }
+    const tipoBtn = e.target.closest("[data-cal-tipo]");
+    if (tipoBtn) { filtroTipo = tipoBtn.dataset.calTipo; memoria.gravar("cal_tipo", filtroTipo); return render(); }
     const cartao = e.target.closest(".cal-card");
     if (cartao) { const c = itens.find((x) => x.id === cartao.dataset.id); if (c) abrirEditor(c); return; }
     const novo = e.target.closest("[data-novo]");
@@ -322,16 +354,16 @@
 
   // Arrastar e soltar: muda a data (ou tira, soltando em "Ideias sem data")
   raiz.addEventListener("dragstart", (e) => {
-    if (App.leitor) return;
     const cartao = e.target.closest?.(".cal-card");
-    if (!cartao) return;
-    arrastando = cartao.dataset.id;
+    if (!cartao || (App.leitor && !cartao.dataset.estudo)) return;
+    arrastandoEstudo = !!cartao.dataset.estudo;
+    arrastando = cartao.dataset.estudo || cartao.dataset.id;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", arrastando);
     cartao.classList.add("arrastando");
   });
   raiz.addEventListener("dragend", () => {
-    arrastando = null;
+    arrastando = null; arrastandoEstudo = false;
     $$(".arrastando, .soltar-aqui", raiz).forEach((el) => el.classList.remove("arrastando", "soltar-aqui"));
   });
   raiz.addEventListener("dragover", (e) => {
@@ -345,10 +377,23 @@
     const alvo = e.target.closest(".cal-dia, .cal-ideias");
     if (!alvo || !arrastando) return;
     e.preventDefault();
-    const c = itens.find((x) => x.id === arrastando);
     const novaData = alvo.dataset.dia || null;
-    arrastando = null;
     alvo.classList.remove("soltar-aqui");
+    // sessão de estudo: remarca (precisa de data)
+    if (arrastandoEstudo) {
+      const s = estudos.find((x) => x.id === arrastando);
+      arrastando = null; arrastandoEstudo = false;
+      if (!s || !novaData || s.data === novaData) { if (s && !novaData) aviso("Sessão de estudo precisa de data.", "atencao"); return; }
+      try {
+        s.data = novaData;
+        render();
+        await window.Formacao.remarcar(s.id, novaData);
+        aviso(`Sessão remarcada para ${deIso(novaData).toLocaleDateString("pt-BR")}.`, "ok");
+      } catch { aviso("Não foi possível remarcar agora.", "erro"); }
+      return carregar(true);
+    }
+    const c = itens.find((x) => x.id === arrastando);
+    arrastando = null; arrastandoEstudo = false;
     if (!c || (c.data || null) === novaData) return;
     try {
       c.data = novaData;
