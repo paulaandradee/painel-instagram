@@ -443,3 +443,12 @@ usam isso (hoje, só @tudoserestaura). As outras seguem com o formulário simple
   (as tarefas do conteúdo não mudam juntas). Clicar no número do dia abre o dia.
 - **Compromissos**: botão "Compromisso" cria uma tarefa fora de um conteúdo.
 - Mudar uma data no painel nunca mexe em nada já agendado na Meta.
+
+## Produção de Conteúdo (Kanban)
+
+Menu "Produção", só para quem tem acesso a uma conta com o recurso `producao`. Seis colunas
+agrupam as 18 etapas: Ideia e planejamento, Roteiro, Gravação, Edição, Aprovação e
+Publicação. Arrastar para outra coluna põe o conteúdo na primeira etapa dela; a etapa exata
+se escolhe no próprio cartão. É o mesmo registro da ficha e do Calendário, e o histórico anota
+quem mudou. O cartão mostra tarefas feitas, atrasadas (borda vermelha), campanha e
+responsáveis. Filtros: busca, conta, campanha e "Em andamento" / "Com finalizados".

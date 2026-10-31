@@ -400,6 +400,8 @@ async function prepararContas() {
   App.conta = App.contas.find((c) => c.id === salva) || App.contas[0] || null;
   $("#menu-acessos").hidden = !App.admin;
   $("#menu-formacao").hidden = !App.admin;
+  App.producao = App.remoto && App.contas.some((c) => c.recursos?.includes("producao"));
+  $("#menu-producao").hidden = !App.producao;
   document.body.classList.toggle("leitor", App.leitor); // esconde os botões de alterar (.so-edicao)
   renderSeletorConta();
 }
@@ -444,7 +446,7 @@ let abaInstagram = memoria.ler("aba_instagram", "automacoes");
 function navegar() {
   if (!App.usuario) return;
   const rota = (location.hash || "#inicio").slice(1);
-  const rotas = ["inicio", "calendario", "instagram"].concat(App.admin ? ["formacao", "acessos"] : []);
+  const rotas = ["inicio", "calendario", "instagram"].concat(App.producao ? ["producao"] : [], App.admin ? ["formacao", "acessos"] : []);
   const valida = rotas.includes(rota) ? rota : "inicio";
   $$(".secao").forEach((s) => (s.hidden = s.id !== `secao-${valida}`));
   $$(".menu-item[data-rota]").forEach((m) => m.classList.toggle("ativo", m.dataset.rota === valida));
@@ -452,6 +454,7 @@ function navegar() {
   if (valida === "inicio") carregarInicio();
   if (valida === "calendario") window.Calendario.carregar(); else window.Calendario?.parar();
   if (valida === "instagram" && App.conta) { trocarAba(abaInstagram); carregarStatusIg(); }
+  if (valida === "producao") window.Producao.carregar();
   if (valida === "formacao") window.Formacao.carregar(); else window.Formacao?.parar();
   if (valida === "acessos") window.Acessos.carregar();
 }

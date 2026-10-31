@@ -431,5 +431,5 @@
     if (novo && !leitor) f("#fi-titulo-in")?.focus();
   }
 
-  window.Ficha = { abrir, ETAPA, TIPOS_TAREFA, ORIGENS };
+  window.Ficha = { abrir, ETAPAS, ETAPA, TIPOS_TAREFA, ORIGENS };
 })();
