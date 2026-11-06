@@ -13,6 +13,7 @@ const MAX_TENTATIVAS = 2;   // erro claro (não ambíguo): no máximo 2 tentativ
 const PAUSA_MIN_MS = 8000;  // entre um envio e outro da fila: 8 a 25s, sorteado
 const PAUSA_MAX_MS = 25000; // (rajada certinha parece robô pro Instagram)
 const SETE_DIAS_MS = 7 * 24 * 3600 * 1000; // resposta a comentário só vale ~7 dias
+const UM_DIA_MS = 24 * 3600 * 1000;        // resposta ao story é DM: janela de 24h
 
 async function drainQueue() {
   const resumo = { enviados: 0, erros: 0, expirados: 0, segurados: 0 };
@@ -25,10 +26,13 @@ async function drainQueue() {
   let jaEnviou = false;
   for (const item of itens ?? []) {
     if (travadas.has(item.conta_id)) { resumo.segurados++; continue; }
+    const story = item.via === "story";
+    const canal = story ? "story" : "private_reply";
 
     // Comentário velho demais: o Instagram não aceita mais resposta privada.
     // Conta a partir do comentário (repescagem) ou de quando entrou na fila.
-    if (Date.now() - new Date(item.comment_ts ?? item.created_at).getTime() > SETE_DIAS_MS) {
+    // Story: a janela do direct é de 24h.
+    if (Date.now() - new Date(item.comment_ts ?? item.created_at).getTime() > (story ? UM_DIA_MS : SETE_DIAS_MS)) {
       await db.from("ig_send_queue").update({ status: "expirado" }).eq("id", item.id);
       resumo.expirados++;
       continue;
@@ -62,14 +66,14 @@ async function drainQueue() {
     jaEnviou = true;
 
     const inicio = new Date(Date.now() - 5000).toISOString();
-    const r = await sendStep(auto as Automation, step, { comment_id: item.comment_id }, item.ig_user_id);
+    const r = await sendStep(auto as Automation, step, story ? { id: item.ig_user_id } : { comment_id: item.comment_id }, item.ig_user_id);
 
     // Erro ambíguo: a DM pode ter saído. Confere pelo eco e NUNCA tenta de novo.
     if (!r.ok && r.ambiguo) {
       const saiu = await confirmarPeloEco(item.conta_id, item.ig_user_id, inicio);
       await recordResult(item.conta_id, saiu, false);
       await logDelivery({
-        conta_id: item.conta_id, ig_user_id: item.ig_user_id, automation_id: auto.id, canal: "private_reply", tipo: r.tipo,
+        conta_id: item.conta_id, ig_user_id: item.ig_user_id, automation_id: auto.id, canal, tipo: r.tipo,
         status: saiu ? "ok" : "incerto", motivo: `fila: ${saiu ? "entregue (confirmado pelo eco)" : "sem confirmação"}; Instagram: ${r.error}`,
       });
       await db.from("ig_send_queue").update({
@@ -77,7 +81,7 @@ async function drainQueue() {
         ...(saiu ? { sent_at: new Date().toISOString() } : {}),
       }).eq("id", item.id);
       if (saiu) {
-        await upsertLead(item.conta_id, item.ig_user_id, { username: item.username, last_source: "comment" });
+        await upsertLead(item.conta_id, item.ig_user_id, { username: item.username, last_source: story ? "story_reply" : "comment" });
         if (item.responder_publico) await replyToComment(auto as Automation, item.comment_id);
         resumo.enviados++;
       } else resumo.erros++;
@@ -86,13 +90,13 @@ async function drainQueue() {
 
     await recordResult(item.conta_id, r.ok, r.hard);
     await logDelivery({
-      conta_id: item.conta_id, ig_user_id: item.ig_user_id, automation_id: auto.id, canal: "private_reply", tipo: r.tipo,
+      conta_id: item.conta_id, ig_user_id: item.ig_user_id, automation_id: auto.id, canal, tipo: r.tipo,
       status: r.ok ? "ok" : "erro", motivo: r.error ? `fila: ${r.error}` : "fila",
     });
 
     if (r.ok) {
       await db.from("ig_send_queue").update({ status: "enviado", sent_at: new Date().toISOString() }).eq("id", item.id);
-      await upsertLead(item.conta_id, item.ig_user_id, { username: item.username, last_source: "comment" });
+      await upsertLead(item.conta_id, item.ig_user_id, { username: item.username, last_source: story ? "story_reply" : "comment" });
       // Responde no comentário junto com a DM (fila do freio ou repescagem)
       if (item.responder_publico) await replyToComment(auto as Automation, item.comment_id);
       resumo.enviados++;

@@ -542,3 +542,13 @@ experimentos A a D e o estudo de caso) foram cadastrados direto no banco, fora d
   autoria dos conteúdos (produção própria, remix, curadoria, terceiros, IA), campanhas,
   automações, relatórios mensais, experimentos e a Formação aplicada (cursos e competências).
   Imprimir / PDF gera a versão limpa.
+
+## Automação por resposta ao story (contas com o recurso `stories`)
+Rode o `28_automacao_stories.sql`. No editor da automação aparece "Quando a pessoa: Comenta no post / Responde ao story".
+- **Responde ao story**: a pessoa responde um story com a palavra (ou qualquer coisa, se "Qualquer palavra ativa") e recebe a Mensagem 1 no direct. Os botões, a conversa e os arquivos funcionam como sempre.
+- A resposta ao story chega como mensagem do direct, então a automação responde por DM normal (pelo id da pessoa). Não há resposta pública, porque story não tem comentário.
+- "Em quais stories": sem escolher nada, vale para todos os stories, inclusive os próximos. O Instagram só lista os stories no ar (últimas 24h), e um story escolhido vale só para ele.
+- Mesmas proteções do comentário: **1 DM de automação por pessoa a cada 24h** (comentário e story contam juntos) e o **mesmo freio da conta** (os tetos não mudaram). Na fila, o envio de story expira em 24h.
+- Quando a automação responde, a IA não gera sugestão para aquela mensagem. A conversa continua na caixa de entrada.
+- Liga em outra conta: `update ig_contas set recursos = array_append(recursos, 'stories') where username = '...';`
+- Deploy: `instagram-webhook` e `ig-scheduler` (`--no-verify-jwt`), `ig-media`, `ig-repescagem`.

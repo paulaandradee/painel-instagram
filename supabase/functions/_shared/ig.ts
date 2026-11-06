@@ -53,6 +53,7 @@ export type Automation = {
   keyword: string;
   match_any: boolean;
   active: boolean;
+  gatilho?: "comentario" | "story";
   media_ids: string[];
   public_reply: string;
   public_reply_variants: string[];
@@ -383,13 +384,18 @@ export async function sendStep(
   return { ok: true, hard: false, tipo };
 }
 
-// ---------- deliverAutomation: entrega a Mensagem 1 (via comentário) ----------
-// Passa pelo FREIO da conta antes. Sem ficha: vai pra fila e retorna "throttled".
+// ---------- deliverAutomation: entrega a Mensagem 1 ----------
+// via "comentario": resposta privada ao comentário (ctx.commentId).
+// via "story": a pessoa respondeu um story, então é DM normal pelo id dela
+// (ctx.commentId leva o mid da mensagem, só pra chave da fila).
+// Passa pelo FREIO da conta antes (o mesmo teto pros dois). Sem ficha:
+// vai pra fila e retorna "throttled".
 export async function deliverAutomation(
   auto: Automation,
-  ctx: { commentId: string; igUserId: string; username?: string },
+  ctx: { commentId: string; igUserId: string; username?: string; via?: "comentario" | "story" },
 ): Promise<"ok" | "throttled" | "erro" | "incerto"> {
-  const base = { conta_id: auto.conta_id, ig_user_id: ctx.igUserId, automation_id: auto.id, canal: "private_reply" };
+  const story = ctx.via === "story";
+  const base = { conta_id: auto.conta_id, ig_user_id: ctx.igUserId, automation_id: auto.id, canal: story ? "story" : "private_reply" };
   const step = firstStep(auto);
   if (!step) {
     await logDelivery({ ...base, tipo: "flow", status: "erro", motivo: "automação sem passos no fluxo" });
@@ -400,12 +406,13 @@ export async function deliverAutomation(
   if (!temFicha) {
     const { error } = await db.from("ig_send_queue").upsert({
       conta_id: auto.conta_id,
-      comment_id: ctx.commentId,
+      comment_id: story ? `story:${ctx.commentId}` : ctx.commentId,
       automation_id: auto.id,
       ig_user_id: ctx.igUserId,
       username: ctx.username ?? null,
       status: "pendente",
-      responder_publico: true, // a resposta no comentário sai junto com a DM
+      via: story ? "story" : "comentario",
+      responder_publico: !story, // a resposta no comentário sai junto com a DM
     }, { onConflict: "comment_id", ignoreDuplicates: true });
     if (error) {
       await logDelivery({ ...base, tipo: "flow", status: "erro", motivo: "falhou ao enfileirar: " + error.message });
@@ -416,7 +423,8 @@ export async function deliverAutomation(
   }
 
   const inicio = new Date(Date.now() - 5000).toISOString();
-  const r = await sendStep(auto, step, { comment_id: ctx.commentId }, ctx.igUserId);
+  const destino: Recipient = story ? { id: ctx.igUserId } : { comment_id: ctx.commentId };
+  const r = await sendStep(auto, step, destino, ctx.igUserId);
   if (!r.ok && r.ambiguo) {
     // Pode ter saído: confere pelo eco e NUNCA tenta de novo
     const saiu = await confirmarPeloEco(auto.conta_id, ctx.igUserId, inicio);

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Seu Painel</title>
-  <link rel="stylesheet" href="css/estilo.css?v=20261031g">
+  <link rel="stylesheet" href="css/estilo.css?v=20261106a">
 </head>
 <body>
 
@@ -264,6 +264,14 @@
         <div class="cartao bloco">
           <div class="bloco-titulo"><span class="bloco-num">1</span><h2 class="subtitulo">O gatilho</h2></div>
 
+          <div class="campo" id="ed-gatilho-area" hidden>
+            <span class="rotulo">Quando a pessoa</span>
+            <div class="segmentado" id="ed-gatilho">
+              <button type="button" data-gatilho="comentario">Comenta no post</button>
+              <button type="button" data-gatilho="story">Responde ao story</button>
+            </div>
+          </div>
+
           <div class="campo">
             <div class="linha-entre"><span class="rotulo">Palavras que ativam</span>
               <label class="switch"><input type="checkbox" id="ed-qualquer"><span class="trilho"></span><span class="pequeno">Qualquer palavra ativa</span></label>
@@ -273,15 +281,15 @@
           </div>
 
           <div class="campo">
-            <span class="rotulo">Em quais posts</span>
+            <span class="rotulo" id="ed-posts-rotulo">Em quais posts</span>
             <div class="linha">
-              <button class="btn btn-p" id="ed-carregar-posts"><span data-icone="imagem"></span> Escolher posts</button>
+              <button class="btn btn-p" id="ed-carregar-posts"><span data-icone="imagem"></span> <span id="ed-carregar-texto">Escolher posts</span></button>
               <span class="pequeno texto-2" id="ed-posts-resumo">Vale pra todos os posts</span>
             </div>
             <div id="ed-posts"></div>
           </div>
 
-          <div class="campo" style="margin-bottom:0">
+          <div class="campo" style="margin-bottom:0" id="ed-resposta-area">
             <span class="rotulo">Resposta no comentário</span>
             <input class="input" id="ed-resposta" placeholder="Ex: te chamei no direct">
             <div id="ed-variacoes"></div>
@@ -364,22 +372,22 @@
 
 <!-- Cliente oficial do Supabase (se não carregar, o modo local continua funcionando) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=20261031g"></script>
-<script src="js/app.js?v=20261031g"></script>
-<script src="js/editor.js?v=20261031g"></script>
-<script src="js/interacoes.js?v=20261031g"></script>
-<script src="js/conversas.js?v=20261031g"></script>
-<script src="js/desempenho.js?v=20261031g"></script>
-<script src="js/relatorio.js?v=20261031g"></script>
-<script src="js/drive.js?v=20261031g"></script>
-<script src="js/ficha.js?v=20261031g"></script>
-<script src="js/calendario.js?v=20261031g"></script>
-<script src="js/producao.js?v=20261031g"></script>
-<script src="js/formacao.js?v=20261031g"></script>
-<script src="js/estrategia.js?v=20261031g"></script>
-<script src="js/laboratorio.js?v=20261031g"></script>
-<script src="js/portfolio.js?v=20261031g"></script>
-<script src="js/analises.js?v=20261031g"></script>
-<script src="js/acessos.js?v=20261031g"></script>
+<script src="js/config.js?v=20261106a"></script>
+<script src="js/app.js?v=20261106a"></script>
+<script src="js/editor.js?v=20261106a"></script>
+<script src="js/interacoes.js?v=20261106a"></script>
+<script src="js/conversas.js?v=20261106a"></script>
+<script src="js/desempenho.js?v=20261106a"></script>
+<script src="js/relatorio.js?v=20261106a"></script>
+<script src="js/drive.js?v=20261106a"></script>
+<script src="js/ficha.js?v=20261106a"></script>
+<script src="js/calendario.js?v=20261106a"></script>
+<script src="js/producao.js?v=20261106a"></script>
+<script src="js/formacao.js?v=20261106a"></script>
+<script src="js/estrategia.js?v=20261106a"></script>
+<script src="js/laboratorio.js?v=20261106a"></script>
+<script src="js/portfolio.js?v=20261106a"></script>
+<script src="js/analises.js?v=20261106a"></script>
+<script src="js/acessos.js?v=20261106a"></script>
 </body>
 </html>

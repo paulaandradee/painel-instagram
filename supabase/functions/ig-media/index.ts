@@ -1,7 +1,8 @@
 // =====================================================================
 // ig-media: posts da conta (com miniatura)
-// Corpo (POST): { conta_id, ids?: [...] }
+// Corpo (POST): { conta_id, ids?: [...], stories?: true }
 // - Sem ids: lista os 50 posts mais recentes (seletor do editor).
+// - stories: true: lista os stories no ar (seletor da automação de story).
 // - Com ids: busca esses posts específicos, mesmo os antigos (fotos na
 //   lista de automações).
 // Só responde pra quem tem acesso à conta.
@@ -43,6 +44,13 @@ Deno.serve(async (req) => {
     );
     const posts = resultados.filter((r) => r.ok).map((r) => formatar(r.data));
     return reply({ ok: true, posts });
+  }
+
+  // Stories no ar agora (o Instagram só lista os das últimas 24h)
+  if (corpo.stories) {
+    const s = await graphGet(conta.token, `/${conta.ig_user_id}/stories`, { fields: CAMPOS, limit: "50" });
+    if (!s.ok) return reply({ ok: false, posts: [], erro: s.error?.message ?? "falha ao listar stories" });
+    return reply({ ok: true, posts: (s.data?.data ?? []).map(formatar) });
   }
 
   // Posts mais recentes

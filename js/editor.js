@@ -21,12 +21,14 @@
   let E = null;          // estado do editor
   let foto = "";         // "foto" do que estava salvo (pra saber se mudou)
   let aberto = false;
-  let postsCache = null; // posts carregados da conta
+  let postsCache = null; // posts (ou stories) carregados da conta
+  let cacheDe = "";      // de qual gatilho é o cache: "comentario" (posts) ou "story"
+  const ehStory = () => E.gatilho === "story";
 
   // ---------------- Estado ----------------
   function estadoNovo() {
     return {
-      id: null, nome: "", active: true,
+      id: null, nome: "", active: true, gatilho: "comentario",
       keywords: [], match_any: false, media_ids: [],
       public_reply: "", variantes: [],
       mensagem: "", botaoLigado: true, botaoTexto: "", acao: "link", link: "",
@@ -42,6 +44,7 @@
     e.id = a.id;
     e.nome = a.nome || "";
     e.active = !!a.active;
+    e.gatilho = a.gatilho || "comentario";
     e.keywords = (a.keyword || "").split(",").map((k) => k.trim()).filter(Boolean);
     e.match_any = !!a.match_any;
     e.media_ids = [...(a.media_ids || [])];
@@ -103,6 +106,7 @@
 
     const a = {
       nome: E.nome.trim(),
+      gatilho: E.gatilho,
       keyword: E.keywords.join(", "),
       match_any: E.match_any,
       active: E.active,
@@ -163,6 +167,8 @@
     $("#ed-botao-texto").value = E.botaoTexto;
     $("#ed-acao").value = E.acao;
     $("#ed-link").value = E.link;
+    // Escolha comentário × story: só em conta com o recurso 'stories'
+    $("#ed-gatilho-area").hidden = !(App.conta?.recursos?.includes("stories") || ehStory());
     renderTags();
     renderVariacoes();
     renderResumoPosts();
@@ -179,8 +185,13 @@
     $("#ed-conversa-area").hidden = E.acao !== "conversa";
     $("#ed-tags").classList.toggle("desligado", E.match_any);
     $("#ed-tags-ajuda").textContent = E.match_any
-      ? "Qualquer comentário no post dispara (as palavras são ignoradas)."
+      ? (ehStory() ? "Qualquer resposta ao story dispara (as palavras são ignoradas)." : "Qualquer comentário no post dispara (as palavras são ignoradas).")
       : "Ex: quero, link, eu. Maiúsculas e acentos não importam.";
+    $$("[data-gatilho]").forEach((b) => b.classList.toggle("ativo", b.dataset.gatilho === E.gatilho));
+    $("#ed-posts-rotulo").textContent = ehStory() ? "Em quais stories" : "Em quais posts";
+    $("#ed-carregar-texto").textContent = ehStory() ? "Escolher stories no ar" : "Escolher posts";
+    // Story não tem comentário público: a resposta vai só no direct
+    $("#ed-resposta-area").hidden = ehStory();
   }
 
   function atualizarBotaoMsg1() {
@@ -224,21 +235,27 @@
   // ---------------- Posts ----------------
   function renderResumoPosts() {
     const n = E.media_ids.length;
+    const item = ehStory() ? "story" : "post";
     $("#ed-posts-resumo").innerHTML = n
-      ? `${n} post${n > 1 ? "s" : ""} escolhido${n > 1 ? "s" : ""} · <a href="#" id="ed-limpar-posts">vale pra todos</a>`
-      : "Vale pra todos os posts";
+      ? `${n} ${item}${n > 1 ? "s" : ""} escolhido${n > 1 ? "s" : ""} · <a href="#" id="ed-limpar-posts">vale pra todos</a>`
+      : ehStory() ? "Vale pra todos os stories (inclusive os próximos)" : "Vale pra todos os posts";
   }
 
   async function carregarPosts() {
     const alvo = $("#ed-posts");
-    alvo.innerHTML = `<div class="ajuda">Carregando posts...</div>`;
-    if (!postsCache) postsCache = await Dados.posts();
+    const item = ehStory() ? "stories" : "posts";
+    alvo.innerHTML = `<div class="ajuda">Carregando ${item}...</div>`;
+    if (!postsCache || cacheDe !== E.gatilho) { postsCache = ehStory() ? await Dados.stories() : await Dados.posts(); cacheDe = E.gatilho; }
     if (!postsCache) {
-      alvo.innerHTML = `<div class="faixa faixa-info" style="margin-top:10px">${icone("info")}<span>Conecte o Instagram pra listar seus posts aqui. Sem escolher nenhum, a automação vale pra todos os posts.</span></div>`;
+      alvo.innerHTML = `<div class="faixa faixa-info" style="margin-top:10px">${icone("info")}<span>Conecte o Instagram pra listar seus ${item} aqui. Sem escolher nenhum, a automação vale pra todos os ${item}.</span></div>`;
       return;
     }
-    if (!postsCache.length) { alvo.innerHTML = `<div class="ajuda">Nenhum post encontrado na conta.</div>`; return; }
+    if (!postsCache.length) {
+      alvo.innerHTML = `<div class="ajuda">${ehStory() ? "Nenhum story no ar agora. O Instagram só mostra os das últimas 24h; sem escolher, vale pra todos (inclusive os que você postar depois)." : "Nenhum post encontrado na conta."}</div>`;
+      return;
+    }
     renderPosts();
+    if (ehStory()) alvo.insertAdjacentHTML("beforeend", `<div class="ajuda">O story sai do ar em 24h. Escolher um story específico vale só para ele.</div>`);
   }
 
   function renderPosts() {
@@ -412,8 +429,8 @@
 
   async function renderPrevia() {
     const chat = $("#previa-chat");
-    const palavra = E.match_any ? "um comentário" : `"${E.keywords[0] || "palavra"}"`;
-    let h = `<div class="cel-aviso">Ela comentou ${esc(palavra)} no seu post</div>`;
+    const palavra = E.match_any ? (ehStory() ? "algo" : "um comentário") : `"${E.keywords[0] || "palavra"}"`;
+    let h = `<div class="cel-aviso">${ehStory() ? `Ela respondeu ${esc(palavra)} ao seu story` : `Ela comentou ${esc(palavra)} no seu post`}</div>`;
 
     if (!E.mensagem.trim()) {
       chat.innerHTML = h + `<div class="cel-vazio">Escreva a sua mensagem pra ver como ela chega no direct.</div>`;
@@ -559,6 +576,14 @@
     $("#ed-ativa").onchange = (e) => { E.active = e.target.checked; };
 
     // Gatilho
+    $("#ed-gatilho").onclick = (e) => {
+      const b = e.target.closest("[data-gatilho]");
+      if (!b || b.dataset.gatilho === E.gatilho) return;
+      E.gatilho = b.dataset.gatilho;
+      E.media_ids = []; // posts e stories são ids diferentes
+      $("#ed-posts").innerHTML = "";
+      renderVisibilidade(); renderResumoPosts(); renderPrevia();
+    };
     $("#ed-qualquer").onchange = (e) => { E.match_any = e.target.checked; renderVisibilidade(); renderPrevia(); };
     const tagInput = $("#ed-tag-input");
     tagInput.onkeydown = (e) => {
@@ -586,7 +611,7 @@
       e.preventDefault();
       E.media_ids = [];
       renderResumoPosts();
-      if (postsCache) renderPosts();
+      if (postsCache && cacheDe === E.gatilho) renderPosts();
     };
 
     $("#ed-resposta").oninput = (e) => { E.public_reply = e.target.value; };

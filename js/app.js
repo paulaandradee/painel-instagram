@@ -273,6 +273,17 @@ const Dados = {
     } catch { return null; }
   },
 
+  // Stories no ar agora (últimas 24h). null = não conectado.
+  async stories() {
+    if (!App.remoto) return null;
+    try {
+      const { data, error } = await sb.functions.invoke("ig-media", { body: { conta_id: App.conta.id, stories: true } });
+      if (error || !data?.ok) return null;
+      (data.posts ?? []).forEach((p) => { Dados._fotos[p.id] = p; });
+      return data.posts ?? [];
+    } catch { return null; }
+  },
+
   // Fotos dos posts vinculados: { idDoPost: { miniatura, link, legenda } }
   // Guarda em memória pra não buscar de novo a cada tela.
   _fotos: {},
@@ -605,16 +616,19 @@ async function carregarAutomacoes() {
       : (a.keyword || "").split(",").map((k) => k.trim()).filter(Boolean).map((k) => `<span class="chip">${esc(k)}</span>`).join("");
     // Foto do post vinculado (o primeiro; "+N" se tiver mais)
     const medias = a.media_ids || [];
+    const story = a.gatilho === "story";
+    const item = story ? "story" : "post";
     const thumb = medias.length
-      ? `<div class="thumb" data-thumb="${esc(medias[0])}" title="${medias.length} post${medias.length > 1 ? "s" : ""} vinculado${medias.length > 1 ? "s" : ""}">${icone("imagem")}${medias.length > 1 ? `<span class="mais">+${medias.length - 1}</span>` : ""}</div>`
-      : `<div class="thumb thumb-todos" title="Vale pra todos os posts">${icone("grade")}</div>`;
+      ? `<div class="thumb" data-thumb="${esc(medias[0])}" title="${medias.length} ${item}${medias.length > 1 ? "s" : ""} vinculado${medias.length > 1 ? "s" : ""}">${icone("imagem")}${medias.length > 1 ? `<span class="mais">+${medias.length - 1}</span>` : ""}</div>`
+      : `<div class="thumb thumb-todos" title="Vale pra todos os ${item}s">${icone("grade")}</div>`;
     return `
       <div class="cartao item-auto" data-id="${esc(a.id)}">
         ${thumb}
         <div class="info">
           <div class="nome">${esc(a.nome || "Sem nome")}</div>
           <div class="chips">${palavras || '<span class="chip">Sem palavra</span>'}
-            <span class="chip">${medias.length ? `${medias.length} post${medias.length > 1 ? "s" : ""}` : "Todos os posts"}</span></div>
+            ${story ? `<span class="chip chip-destaque">Resposta ao story</span>` : ""}
+            <span class="chip">${medias.length ? `${medias.length} ${item}${medias.length > 1 ? "s" : ""}` : `Todos os ${item}s`}</span></div>
         </div>
         <label class="switch so-edicao" title="Ligar ou desligar"><input type="checkbox" data-acao="ligar" ${a.active ? "checked" : ""}><span class="trilho"></span></label>
         <span class="status ${a.active ? "on" : "off"}">${a.active ? "Ligada" : "Desligada"}</span>

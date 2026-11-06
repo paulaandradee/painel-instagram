@@ -1,8 +1,8 @@
 // =====================================================================
 // instagram-webhook: o CÉREBRO
 // - GET: aperto de mão com o Meta (hub.challenge)
-// - POST: recebe comentários, mensagens, toques em botão (postback e
-//   quick_reply) e responde sozinho às AUTOMAÇÕES. Mensagens do direct
+// - POST: recebe comentários, mensagens, respostas a stories, toques em
+//   botão (postback e quick_reply) e responde sozinho às AUTOMAÇÕES. Mensagens do direct
 //   também vão pra caixa de entrada (tabela mensagens) com uma sugestão
 //   da IA, que só sai quando alguém clicar em Enviar no painel.
 // Várias contas: cada evento diz qual conta recebeu (entry.id). O webhook
@@ -45,10 +45,12 @@ async function firstTime(eventId: string): Promise<boolean> {
   return !error; // erro de chave duplicada = já processado
 }
 
-// Acha a automação certa DA CONTA. Prioridade: post específico > todos os
-// posts; palavra-chave > "qualquer palavra".
-async function findAutomation(conta: Conta, text: string, mediaId?: string): Promise<{ auto: Automation; keyword: string } | null> {
-  const { data } = await db.from("ig_automations").select("*").eq("conta_id", conta.id).eq("active", true);
+// Acha a automação certa DA CONTA. Prioridade: post (ou story) específico >
+// todos; palavra-chave > "qualquer palavra". gatilho: comentário ou story.
+async function findAutomation(
+  conta: Conta, text: string, mediaId?: string, gatilho: "comentario" | "story" = "comentario",
+): Promise<{ auto: Automation; keyword: string } | null> {
+  const { data } = await db.from("ig_automations").select("*").eq("conta_id", conta.id).eq("active", true).eq("gatilho", gatilho);
   let best: { auto: Automation; keyword: string; score: number } | null = null;
   for (const auto of (data ?? []) as Automation[]) {
     const medias = auto.media_ids ?? [];
@@ -61,12 +63,13 @@ async function findAutomation(conta: Conta, text: string, mediaId?: string): Pro
   return best ? { auto: best.auto, keyword: best.keyword } : null;
 }
 
-// Regra do "1 por dia" (por conta): já recebeu uma DM ok nas últimas 24h?
+// Regra do "1 por dia" (por conta): já recebeu uma DM ok de automação
+// (comentário ou story) nas últimas 24h?
 async function receivedToday(conta: Conta, igUserId: string): Promise<boolean> {
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const { count } = await db.from("ig_deliveries")
     .select("id", { count: "exact", head: true })
-    .eq("conta_id", conta.id).eq("ig_user_id", igUserId).eq("canal", "private_reply").eq("status", "ok").gte("ts", since);
+    .eq("conta_id", conta.id).eq("ig_user_id", igUserId).in("canal", ["private_reply", "story"]).eq("status", "ok").gte("ts", since);
   return (count ?? 0) > 0;
 }
 
@@ -138,6 +141,26 @@ async function handleComment(conta: Conta, value: any) {
 }
 
 // =====================================================================
+// RESPOSTA AO STORY (a pessoa respondeu um story com a palavra)
+// Chega como mensagem do direct, então a resposta é DM normal pelo id.
+// Mesmas regras do comentário: 1 por dia e o freio da conta.
+// =====================================================================
+async function handleStoryReply(conta: Conta, auto: Automation, keyword: string, senderId: string, mid?: string) {
+  const isTest = ENV.TEST_IG_ACCOUNTS.includes(senderId);
+  if (!isTest && (await receivedToday(conta, senderId))) {
+    await logDelivery({ conta_id: conta.id, ig_user_id: senderId, automation_id: auto.id, canal: "story", tipo: "flow", status: "erro", motivo: "pulado: já recebeu DM nas últimas 24h" });
+    return;
+  }
+  const { data: lead } = await db.from("ig_leads").select("username").eq("conta_id", conta.id).eq("ig_user_id", senderId).maybeSingle();
+  const result = await deliverAutomation(auto, {
+    commentId: mid ?? `${senderId}:${Date.now()}`, igUserId: senderId, username: lead?.username ?? undefined, via: "story",
+  });
+  if (result !== "erro") {
+    await upsertLead(conta.id, senderId, { last_source: "story_reply", last_keyword: keyword, automation_id: auto.id });
+  }
+}
+
+// =====================================================================
 // MENSAGEM / POSTBACK / QUICK_REPLY
 // =====================================================================
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -172,6 +195,13 @@ async function handleMessage(conta: Conta, ev: any) {
     if (!(await firstTime(`msg:${mid}`))) return;
   }
 
+  // Resposta a um story com a palavra de uma automação de story?
+  // (procura antes: se a automação responde, a IA não gasta sugestão)
+  const storyId: string | undefined = msg?.reply_to?.story?.id;
+  const doStory = msg?.reply_to?.story && msg?.text && !msg?.quick_reply
+    ? await findAutomation(conta, msg.text, storyId ? String(storyId) : undefined, "story")
+    : null;
+
   // Caixa de entrada: salva a mensagem e, se for texto escrito (não toque
   // em botão), pede uma SUGESTÃO de resposta. Nada é enviado sozinho.
   // Uma falha aqui nunca pode travar as automações logo abaixo.
@@ -182,14 +212,15 @@ async function handleMessage(conta: Conta, ev: any) {
       const novaId = conversa ? await gravarMensagem(conversa, "cliente", textoConversa, mid ?? null, quando, midiaDoEvento(msg)) : null;
       const tocouBotao = !!(postback || msg?.quick_reply);
       // Família: sem sugestão automática (não gasta a cota da IA)
-      if (conversa && novaId && msg?.text && !tocouBotao && conversa.status !== "familia") emSegundoPlano(gerarSugestao(conversa, novaId));
+      if (conversa && novaId && msg?.text && !tocouBotao && !doStory && conversa.status !== "familia") emSegundoPlano(gerarSugestao(conversa, novaId));
     } catch (e) { console.error("[caixa de entrada] mensagem não gravada:", e); }
   }
 
   const source = msg?.reply_to?.story ? "story_reply" : "dm";
 
-  // Conta a interação (só de quem já é lead da conta) e tenta completar nome e @
-  await registrarInteracao(conta.id, senderId, false);
+  // Conta a interação (só de quem já é lead da conta; resposta ao story com
+  // a palavra cria o lead, como no comentário) e tenta completar nome e @
+  await registrarInteracao(conta.id, senderId, !!doStory);
   await completarPerfil(conta, senderId);
 
   // Automação pelo id, só se for desta conta
@@ -209,6 +240,12 @@ async function handleMessage(conta: Conta, ev: any) {
     await upsertLead(conta.id, senderId, { last_source: source, expecting: null });
     const r = await sendStep(auto, step, { id: senderId }, senderId);
     await logDelivery({ conta_id: conta.id, ig_user_id: senderId, automation_id: auto.id, canal: "dm", tipo: r.tipo, status: r.ok ? "ok" : "erro", motivo: r.error });
+    return;
+  }
+
+  // ---- Resposta ao story com a palavra: manda a Mensagem 1 ----
+  if (doStory) {
+    await handleStoryReply(conta, doStory.auto, doStory.keyword, senderId, mid);
     return;
   }
 

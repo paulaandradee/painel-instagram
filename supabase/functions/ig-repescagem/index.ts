@@ -130,6 +130,7 @@ Deno.serve(async (req) => {
   try { corpo = await req.json(); } catch { /* sem corpo */ }
   const { data: auto } = await db.from("ig_automations").select("*").eq("id", corpo.automation_id ?? "").maybeSingle();
   if (!auto) return reply({ ok: false, erro: "Automação não encontrada" });
+  if (auto.gatilho === "story") return reply({ ok: false, erro: "A repescagem é só para automações de comentário." });
   // Só repesca em conta que a pessoa pode acessar
   const conta = await contaDoUsuario(userId, auto.conta_id);
   if (!conta) return reply({ ok: false, erro: "Sem acesso a esta conta, ou conta sem token." });
